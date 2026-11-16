@@ -370,9 +370,21 @@ try {
   assert.equal(reviewTask.get('reviewCycle'), 1);
   assert.equal(reviewTask.get('reviewWorkingDays'), 2);
   assert.ok(reviewTask.get('reviewSubmittedAt'));
+  assert.ok(reviewTask.get('reviewDeadlineAt'));
+  assert.ok(reviewTask.get('reviewDeadlineAt').toMillis() > reviewTask.get('reviewSubmittedAt').toMillis());
+  await ownerPage.getByRole('button', { name: '캘린더' }).click();
+  await ownerPage.getByRole('button', { name: '내가 검수할 업무' }).click();
+  const seoulMonth = (date) => {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric' }).formatToParts(date);
+    return Number(parts.find((part) => part.type === 'year').value) * 12 + Number(parts.find((part) => part.type === 'month').value);
+  };
+  const monthShift = seoulMonth(reviewTask.get('reviewDeadlineAt').toDate()) - seoulMonth(new Date());
+  for (let index = 0; index < Math.abs(monthShift); index += 1) await ownerPage.getByRole('button', { name: monthShift > 0 ? '다음 달' : '이전 달' }).click();
+  await ownerPage.getByTitle(/^검수 · 검수 요청 업무 ·/).first().waitFor();
   await ownerPage.getByRole('button', { name: '업무 보드' }).click();
   const requesterReviewCard = ownerPage.getByRole('article').filter({ hasText: '검수 요청 업무' });
   await requesterReviewCard.getByText('담당자가 검수를 요청했습니다.').waitFor();
+  await requesterReviewCard.getByText(/검수 기한/).first().waitFor();
   await requesterReviewCard.getByRole('button', { name: '이력 보기' }).click();
   await requesterReviewCard.getByText('검수 요청 제출', { exact: true }).waitFor();
   await requesterReviewCard.getByText('검수 기간 2근무일 · 1회차').waitFor();
@@ -385,7 +397,9 @@ try {
   await reviewTaskCard.getByRole('button', { name: '재제출' }).click();
   await requesterReviewCard.getByText('검수 요청됨').waitFor();
   await requesterReviewCard.getByText('검수 재제출', { exact: true }).waitFor();
-  assert.equal((await db.doc(`tasks/${reviewTask.id}`).get()).get('reviewCycle'), 2);
+  const resubmittedReview = await db.doc(`tasks/${reviewTask.id}`).get();
+  assert.equal(resubmittedReview.get('reviewCycle'), 2);
+  assert.ok(resubmittedReview.get('reviewDeadlineAt').toMillis() > reviewTask.get('reviewDeadlineAt').toMillis());
   await requesterReviewCard.getByRole('button', { name: '검수 승인' }).click();
   await requesterReviewCard.getByText('요청자가 검수를 승인했습니다.').waitFor();
   assert.equal((await db.doc(`tasks/${reviewTask.id}`).get()).get('completionReason'), 'APPROVED');

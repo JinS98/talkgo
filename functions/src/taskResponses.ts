@@ -1,6 +1,7 @@
 import { type Firestore, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { RespondToTaskRequest, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
+import { calculateReviewDeadline } from './reviewDeadline.js';
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const actions = new Set<TaskRequestAction>(['accept', 'decline', 'startProgress', 'proposeDueDate', 'approveDueDate', 'rejectDueDate', 'submitForReview', 'complete', 'approveReview', 'rejectReview', 'resubmitForReview']);
@@ -121,6 +122,8 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
     }
 
     const now = Timestamp.now();
+    const reviewDeadline = input.action === 'submitForReview' || input.action === 'resubmitForReview'
+      ? Timestamp.fromDate(calculateReviewDeadline(now.toDate(), reviewDays as number)) : null;
     const updates: { updatedAt: Timestamp; status?: TaskStatus; proposedDueDate?: Timestamp | null; dueDate?: Timestamp; reviewCycle?: number; reviewSubmittedAt?: Timestamp; reviewDeadlineAt?: Timestamp | null; reviewRejectionReason?: string | null; completionReason?: 'APPROVED' | 'NO_REVIEW' } = { updatedAt: now };
     let status: TaskStatus = currentStatus;
     let due = currentDue;
@@ -128,11 +131,11 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
     if (input.action === 'accept') { status = 'ACCEPTED'; updates.status = status; }
     if (input.action === 'decline') { status = 'DECLINED'; updates.status = status; updates.proposedDueDate = null; proposed = null; }
     if (input.action === 'startProgress') { status = 'IN_PROGRESS'; updates.status = status; }
-    if (input.action === 'submitForReview') { status = 'REVIEW_PENDING'; updates.status = status; updates.reviewCycle = 1; updates.reviewSubmittedAt = now; }
+    if (input.action === 'submitForReview') { status = 'REVIEW_PENDING'; updates.status = status; updates.reviewCycle = 1; updates.reviewSubmittedAt = now; updates.reviewDeadlineAt = reviewDeadline; }
     if (input.action === 'complete') { status = 'DONE'; updates.status = status; updates.completionReason = 'NO_REVIEW'; }
     if (input.action === 'approveReview') { status = 'DONE'; updates.status = status; updates.completionReason = 'APPROVED'; updates.reviewDeadlineAt = null; }
     if (input.action === 'rejectReview') { status = 'REWORK'; updates.status = status; updates.reviewRejectionReason = input.reason; updates.reviewDeadlineAt = null; }
-    if (input.action === 'resubmitForReview') { status = 'REVIEW_PENDING'; updates.status = status; updates.reviewCycle = reviewCycle + 1; updates.reviewSubmittedAt = now; updates.reviewDeadlineAt = null; updates.reviewRejectionReason = null; }
+    if (input.action === 'resubmitForReview') { status = 'REVIEW_PENDING'; updates.status = status; updates.reviewCycle = reviewCycle + 1; updates.reviewSubmittedAt = now; updates.reviewDeadlineAt = reviewDeadline; updates.reviewRejectionReason = null; }
     if (input.action === 'proposeDueDate') { updates.proposedDueDate = input.proposedDue; proposed = input.proposedDue; }
     if (input.action === 'approveDueDate') { updates.dueDate = pendingDue; updates.proposedDueDate = null; due = pendingDue!; proposed = null; }
     if (input.action === 'rejectDueDate') { updates.proposedDueDate = null; proposed = null; }
@@ -144,9 +147,9 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
         : input.action === 'rejectDueDate'
           ? { proposedDueDate: pendingDue!.toDate().toISOString() }
           : input.action === 'submitForReview'
-            ? { reviewCycle: 1, reviewWorkingDays: reviewDays as number }
+            ? { reviewCycle: 1, reviewWorkingDays: reviewDays as number, reviewDeadlineAt: reviewDeadline!.toDate().toISOString() }
           : input.action === 'resubmitForReview'
-            ? { reviewCycle: reviewCycle + 1, reviewWorkingDays: reviewDays as number }
+            ? { reviewCycle: reviewCycle + 1, reviewWorkingDays: reviewDays as number, reviewDeadlineAt: reviewDeadline!.toDate().toISOString() }
           : input.action === 'rejectReview'
             ? { reviewCycle: reviewCycle as number, rejectionReason: input.reason as string }
           : input.action === 'approveReview'

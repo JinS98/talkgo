@@ -36,6 +36,7 @@ export interface TaskEventRecord<TimestampValue> {
     dueDate?: string;
     reviewCycle?: number;
     reviewWorkingDays?: number;
+    reviewDeadlineAt?: string;
     rejectionReason?: string;
     completionReason?: TaskCompletionReason;
   };

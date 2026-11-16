@@ -20,6 +20,7 @@
     "lint": "npm run lint -w @taskgo/web",
     "test:ui": "npm run test:ui -w @taskgo/web",
     "test:calendar": "node --disable-warning=ExperimentalWarning --experimental-strip-types apps/web/scripts/verify-calendar-layout.mjs",
+    "test:review-deadline": "npm run build:functions && node functions/scripts/verify-review-deadline.mjs",
     "test:chat": "npm run verify:chat -w @taskgo/web",
     "build:socket": "npm run build -w @taskgo/socket-server",
     "dev:socket": "npm run dev -w @taskgo/socket-server",

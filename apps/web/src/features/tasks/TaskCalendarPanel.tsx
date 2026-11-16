@@ -39,11 +39,15 @@ export function TaskCalendarPanel({ db, workspaceId, viewerId }: { db: Firestore
   const visibleTasks = tasks.filter((task) => task.status !== 'DECLINED' && (filter === 'team' || filter === 'mine' && task.assigneeId === viewerId || filter === 'review' && task.reviewRequired && task.requesterId === viewerId));
   const weeks = buildCalendarWeeks(month.year, month.month, visibleTasks
     .filter((task) => task.dueDate instanceof Timestamp)
-    .map((task) => ({
-      id: task.id, title: task.title, status: task.status,
-      createdAt: task.createdAt instanceof Timestamp ? task.createdAt.toDate() : task.dueDate.toDate(),
-      dueDate: task.dueDate.toDate(),
-    })));
+    .map((task) => {
+      const reviewRange = filter === 'review' && task.status === 'REVIEW_PENDING'
+        && task.reviewSubmittedAt instanceof Timestamp && task.reviewDeadlineAt instanceof Timestamp;
+      return {
+        id: task.id, title: reviewRange ? `검수 · ${task.title}` : task.title, status: task.status,
+        createdAt: reviewRange ? task.reviewSubmittedAt!.toDate() : task.createdAt instanceof Timestamp ? task.createdAt.toDate() : task.dueDate.toDate(),
+        dueDate: reviewRange ? task.reviewDeadlineAt!.toDate() : task.dueDate.toDate(),
+      };
+    }));
 
   function moveMonth(offset: number) {
     const next = new Date(Date.UTC(month.year, month.month - 1 + offset, 1));
@@ -85,7 +89,7 @@ export function TaskCalendarPanel({ db, workspaceId, viewerId }: { db: Firestore
       </div>)}
     </div></div>
     <div className={styles.legend}><span>확정된 업무</span><span className={styles.pendingKey}>요청 대기 업무</span></div>
-    {filter === 'review' && <p className={styles.note}>현재는 검수가 필요한 업무의 요청일~마감일을 표시합니다. 검수 기한은 근무시간 계산 기능과 함께 추가됩니다.</p>}
+    {filter === 'review' && <p className={styles.note}>검수 대기 중인 업무는 제출일부터 검수 기한까지, 그 외 검수 대상 업무는 요청일부터 업무 마감일까지 표시합니다.</p>}
     {openDay && <dialog ref={dialogRef} className={styles.dayDialog} style={{ left: openDay.left, top: openDay.top }} aria-labelledby="calendar-day-title" onCancel={() => setOpenDay(null)} onClick={(event) => { if (event.target === event.currentTarget) setOpenDay(null); }}>
       <div className={styles.dialogHeading}><div><small>{weekdayLabels[new Date(Date.UTC(openDay.day.year, openDay.day.month - 1, openDay.day.day)).getUTCDay()]}</small><h2 id="calendar-day-title">{openDay.day.month}월 {openDay.day.day}일</h2><p>업무 {openDay.day.items.length}개</p></div><button type="button" aria-label="일정 목록 닫기" onClick={() => setOpenDay(null)}>×</button></div>
       <ul className={styles.dayTaskList}>{openDay.day.items.map((item) => <li key={item.id} className={item.status === 'REQUESTED' ? styles.pendingTask : ''}><strong>{item.title}</strong><span>{item.status === 'REQUESTED' ? '요청 대기' : '확정 업무'}</span><small>{dateTime.format(item.createdAt)} ~ {dateTime.format(item.dueDate)}</small></li>)}</ul>

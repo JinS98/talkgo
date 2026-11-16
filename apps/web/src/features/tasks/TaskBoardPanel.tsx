@@ -25,7 +25,7 @@ const eventLabels: Record<TaskRequestAction, string> = {
 };
 
 function formatDate(value: Timestamp | null): string {
-  return value ? new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }).format(value.toDate()) : '';
+  return value ? new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short' }).format(value.toDate()) : '';
 }
 
 function localDateTime(date: Date): string {
@@ -54,6 +54,7 @@ function TaskHistory({ db, task, memberNames }: { db: Firestore; task: BoardTask
         {event.action === 'approveDueDate' && event.metadata.dueDate && <small>확정 {formatDate(Timestamp.fromDate(new Date(event.metadata.dueDate)))}</small>}
         {event.action === 'submitForReview' && event.metadata.reviewWorkingDays && <small>검수 기간 {event.metadata.reviewWorkingDays}근무일 · {event.metadata.reviewCycle}회차</small>}
         {event.action === 'resubmitForReview' && event.metadata.reviewWorkingDays && <small>검수 기간 {event.metadata.reviewWorkingDays}근무일 · {event.metadata.reviewCycle}회차</small>}
+        {(event.action === 'submitForReview' || event.action === 'resubmitForReview') && event.metadata.reviewDeadlineAt && <small>검수 기한 {formatDate(Timestamp.fromDate(new Date(event.metadata.reviewDeadlineAt)))}</small>}
         {event.action === 'rejectReview' && event.metadata.rejectionReason && <small>사유: {event.metadata.rejectionReason}</small>}
       </li>)}
     </ol>}
@@ -112,7 +113,7 @@ function TaskCard({ task, auth, db, functions, viewerId, memberNames, onNotice }
     {task.description && <p className={styles.description}>{task.description}</p>}
     <div className={styles.meta}><span>요청 {memberNames[task.requesterId] ?? '멤버'}</span><span>담당 {memberNames[task.assigneeId] ?? '멤버'}</span>{task.estimatedMinutes && <span>예상 {task.estimatedMinutes}분</span>}{task.reviewRequired && <span>검수 {task.reviewWorkingDays}근무일</span>}</div>
     {task.proposedDueDate && <div className={styles.proposal}><strong>제안된 마감</strong><span>{formatDate(task.proposedDueDate)}</span><small>요청자가 승인하기 전까지 기존 마감일이 유지됩니다.</small></div>}
-    {task.status === 'REVIEW_PENDING' && <div className={styles.reviewInfo}><strong>검수 요청됨</strong><span>{isRequester ? '담당자가 검수를 요청했습니다.' : '요청자의 검수를 기다리는 중입니다.'}</span><small>{task.reviewSubmittedAt && `제출 ${formatDate(task.reviewSubmittedAt)} · `}검수 기간 {task.reviewWorkingDays}근무일</small></div>}
+    {task.status === 'REVIEW_PENDING' && <div className={styles.reviewInfo}><strong>검수 요청됨</strong><span>{isRequester ? '담당자가 검수를 요청했습니다.' : '요청자의 검수를 기다리는 중입니다.'}</span><small>{task.reviewSubmittedAt && `제출 ${formatDate(task.reviewSubmittedAt)} · `}{task.reviewDeadlineAt ? `검수 기한 ${formatDate(task.reviewDeadlineAt)}` : `검수 기간 ${task.reviewWorkingDays}근무일`}</small></div>}
     {task.status === 'REWORK' && <div className={`${styles.reviewInfo} ${styles.reworkInfo}`}><strong>재작업 요청됨</strong><span>{task.reviewRejectionReason ?? '요청자의 반려 사유를 확인해 주세요.'}</span><small>{task.reviewCycle}회차 검수 반려</small></div>}
     {task.status === 'DONE' && <div className={styles.reviewInfo}><strong>완료됨</strong><span>{task.completionReason === 'APPROVED' ? '요청자가 검수를 승인했습니다.' : '검수 없이 완료한 업무입니다.'}</span></div>}
     {isAssignee && negotiable && <div className={styles.actions}>

@@ -7,6 +7,7 @@ import { connectAuthEmulator, getAuth, signInWithEmailAndPassword } from 'fireba
 import { collection, connectFirestoreEmulator, doc, getDoc, getDocs, getFirestore, query, setDoc, where } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { openAiTaskCandidates, suggestTaskFromMessage } from '../lib/taskSuggestions.js';
+import { calculateReviewDeadline } from '../lib/reviewDeadline.js';
 
 assert.equal(process.env.GCLOUD_PROJECT, 'demo-taskgo');
 const projectId = 'demo-taskgo';
@@ -276,7 +277,7 @@ try {
   assert.equal(reviewTask.get('status'), 'REVIEW_PENDING');
   assert.equal(reviewTask.get('reviewCycle'), 1);
   assert.ok(reviewTask.get('reviewSubmittedAt') instanceof Timestamp);
-  assert.equal(reviewTask.get('reviewDeadlineAt'), null);
+  assert.equal(reviewTask.get('reviewDeadlineAt').toDate().toISOString(), calculateReviewDeadline(reviewTask.get('reviewSubmittedAt').toDate(), 2).toISOString());
   assert.equal(reviewTask.get('reviewWorkingDays'), 2);
   assert.equal(reviewTask.get('proposedDueDate'), null);
   assert.equal((await getDoc(doc(owner.db, 'tasks', reviewTaskId))).data().status, 'REVIEW_PENDING');
@@ -287,6 +288,7 @@ try {
   assert.ok(submitEvent);
   assert.equal(submitEvent.get('metadata.reviewCycle'), 1);
   assert.equal(submitEvent.get('metadata.reviewWorkingDays'), 2);
+  assert.equal(submitEvent.get('metadata.reviewDeadlineAt'), reviewTask.get('reviewDeadlineAt').toDate().toISOString());
   assert.equal((await adminDb.collection('taskEvents').get()).size, 21);
 
   await rejected(assignee.respond({ taskId: reviewTaskId, action: 'approveReview' }), 'permission-denied');
@@ -310,7 +312,8 @@ try {
   assert.equal(resubmittedTask.get('reviewCycle'), 2);
   assert.equal(resubmittedTask.get('reviewRejectionReason'), null);
   assert.ok(resubmittedTask.get('reviewSubmittedAt') instanceof Timestamp);
-  assert.equal(resubmittedTask.get('reviewDeadlineAt'), null);
+  assert.equal(resubmittedTask.get('reviewDeadlineAt').toDate().toISOString(), calculateReviewDeadline(resubmittedTask.get('reviewSubmittedAt').toDate(), 2).toISOString());
+  assert.ok(resubmittedTask.get('reviewDeadlineAt').toMillis() > reviewTask.get('reviewDeadlineAt').toMillis());
   const approvals = await Promise.allSettled([
     owner.respond({ taskId: reviewTaskId, action: 'approveReview' }),
     owner.respond({ taskId: reviewTaskId, action: 'approveReview' }),
@@ -321,6 +324,7 @@ try {
   assert.equal(approvedTask.get('status'), 'DONE');
   assert.equal(approvedTask.get('completionReason'), 'APPROVED');
   assert.equal(approvedTask.get('reviewCycle'), 2);
+  assert.equal(approvedTask.get('reviewDeadlineAt'), null);
   await rejected(owner.respond({ taskId: reviewTaskId, action: 'rejectReview', rejectionReason: '다시 반려' }), 'failed-precondition');
 
   await rejected(owner.respond({ taskId: channelTaskId, action: 'complete' }), 'permission-denied');
@@ -334,6 +338,7 @@ try {
   assert.equal(reviewHistory.docs.filter((event) => event.get('action') === 'rejectReview').length, 1);
   assert.equal(reviewHistory.docs.find((event) => event.get('action') === 'rejectReview')?.get('metadata.rejectionReason'), '수정할 내용이 있습니다.');
   assert.equal(reviewHistory.docs.find((event) => event.get('action') === 'resubmitForReview')?.get('metadata.reviewCycle'), 2);
+  assert.equal(reviewHistory.docs.find((event) => event.get('action') === 'resubmitForReview')?.get('metadata.reviewDeadlineAt'), resubmittedTask.get('reviewDeadlineAt').toDate().toISOString());
   assert.equal((await adminDb.collection('taskEvents').get()).size, 25);
 
   const selfTaskId = (await member.create({
