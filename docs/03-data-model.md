@@ -13,7 +13,7 @@
 - `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType(channel/dm), title, description, requesterId, createdById, assigneeId, dueDate, proposedDueDate, estimatedMinutes, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewSubmittedAt, reviewRejectionReason, reviewDeadlineAt, completionReason, createdAt, updatedAt. 날짜 필드는 Firestore Timestamp이며, 미확정 값은 null이다. 기존 업무에는 `createdById`가 없을 수 있다. 타입 계약은 `shared/contracts/src/task.ts`에 둔다.
 - `taskEvents/{eventId}`: taskId, actorId, action, createdAt, metadata
 - `notifications/{id}`: workspaceId, recipientId, taskId, reviewCycle, type(REVIEW_SUBMITTED/REVIEW_8H/REVIEW_2H/REVIEW_COMPLETED), title, completionReason(완료 시), createdAt, sentAt, readAt. 문서 ID는 업무·회차·종류·수신자 조합의 SHA-256 해시다. 제목과 상태만 저장하며 원본 채팅·DM 본문은 포함하지 않는다.
-- `meetings/{id}`: workspaceId, title, startsAt, endsAt
+- `meetings/{id}`: workspaceId, title, createdById, startsAt, endsAt, createdAt, updatedAt. 날짜 필드는 Firestore Timestamp다. 멤버의 서버 호출에서 시작 시각이 미래이고 종료가 시작 후 24시간 이내인지 검증한 뒤 생성하며 클라이언트 직접 쓰기는 금지한다.
 
 업무 보드는 워크스페이스 멤버가 같은 `tasks` 문서를 실시간으로 읽어 요청 대기·수락/진행·완료/거절 열로 나눈다. 내 담당·내가 요청한 업무 범위와 제목 검색은 클라이언트 표시 필터이며 서버 데이터와 권한을 바꾸지 않는다. 카드에는 공개 업무 메타데이터만 표시하고 원본 채팅/DM 본문은 조회하지 않는다.
 

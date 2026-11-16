@@ -1,98 +1,121 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/react/daygrid';
+import classicThemePlugin from '@fullcalendar/react/themes/classic';
+import koLocale from '@fullcalendar/react/locales/ko';
+import type { CalendarRef, EventDisplayInfo, MountInfo } from '@fullcalendar/react';
+import '@fullcalendar/react/skeleton.css';
+import '@fullcalendar/react/themes/classic/theme.css';
+import '@fullcalendar/react/themes/classic/palette.css';
+import { getIdToken, type Auth } from 'firebase/auth';
 import { collection, onSnapshot, query, Timestamp, where, type Firestore } from 'firebase/firestore';
+import { httpsCallable, type Functions } from 'firebase/functions';
 import type { TaskRecord } from '@taskgo/contracts/task';
-import { buildCalendarWeeks, koreanDateKey, visibleEventRows, type CalendarDay } from './calendarLayout';
+import { buildCalendarEvents, koreanDateKey, type CalendarFilter } from './calendarEvents';
 import styles from './TaskCalendarPanel.module.scss';
 
 type CalendarTask = TaskRecord<Timestamp> & { id: string };
-type CalendarFilter = 'team' | 'mine' | 'review';
+type MeetingRecord = { id: string; title: string; startsAt: Timestamp; endsAt: Timestamp };
 const filters: { id: CalendarFilter; label: string }[] = [
-  { id: 'team', label: '팀 전체 일정' },
-  { id: 'mine', label: '내 담당 업무' },
-  { id: 'review', label: '내가 검수할 업무' },
+  { id: 'team', label: '팀 전체 일정' }, { id: 'mine', label: '내 담당 업무' }, { id: 'review', label: '내가 검수할 업무' },
 ];
-const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
 const dateTime = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short' });
+function inputValue(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+function eventTitle(info: MountInfo<EventDisplayInfo>) {
+  const { startsAt, endsAt } = info.event.extendedProps as { startsAt?: string; endsAt?: string };
+  if (startsAt && endsAt) info.el.title = `${info.event.title} · ${dateTime.format(new Date(startsAt))} ~ ${dateTime.format(new Date(endsAt))}`;
+}
 
-export function TaskCalendarPanel({ db, workspaceId, viewerId }: { db: Firestore; workspaceId: string; viewerId: string }) {
-  const todayKey = koreanDateKey(new Date());
-  const [todayYear, todayMonth] = todayKey.split('-').map(Number);
-  const [month, setMonth] = useState({ year: todayYear, month: todayMonth });
-  const [filter, setFilter] = useState<CalendarFilter>('team');
-  const [snapshotState, setSnapshotState] = useState<{ workspaceId: string; tasks: CalendarTask[]; error: string } | null>(null);
-  const [openDay, setOpenDay] = useState<{ day: CalendarDay; left: number; top: number } | null>(null);
+export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }: { auth: Auth; db: Firestore; functions: Functions; workspaceId: string; viewerId: string }) {
+  const calendarRef = useRef<CalendarRef>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [month, setMonth] = useState(() => koreanDateKey(new Date()).slice(0, 7));
+  const [filter, setFilter] = useState<CalendarFilter>('team');
+  const [tasks, setTasks] = useState<CalendarTask[]>([]);
+  const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
+  const [tasksLoaded, setTasksLoaded] = useState(false);
+  const [meetingsLoaded, setMeetingsLoaded] = useState(false);
+  const [error, setError] = useState('');
+  const [meetingOpen, setMeetingOpen] = useState(false);
+  const [meetingTitle, setMeetingTitle] = useState('');
+  const [meetingStart, setMeetingStart] = useState(() => inputValue(new Date(Date.now() + 60 * 60_000)));
+  const [meetingEnd, setMeetingEnd] = useState(() => inputValue(new Date(Date.now() + 2 * 60 * 60_000)));
+  const [meetingError, setMeetingError] = useState('');
+  const [meetingPending, setMeetingPending] = useState(false);
 
-  useEffect(() => onSnapshot(query(collection(db, 'tasks'), where('workspaceId', '==', workspaceId)), (snapshot) => {
-    setSnapshotState({ workspaceId, tasks: snapshot.docs.map((item) => ({ ...item.data() as TaskRecord<Timestamp>, id: item.id })), error: '' });
-  }, () => setSnapshotState({ workspaceId, tasks: [], error: '일정을 불러오지 못했습니다. 연결 상태를 확인해 주세요.' })), [db, workspaceId]);
-
+  useEffect(() => onSnapshot(query(collection(db, 'tasks'), where('workspaceId', '==', workspaceId)), snapshot => {
+    setTasks(snapshot.docs.map(item => ({ ...item.data() as TaskRecord<Timestamp>, id: item.id })));
+    setTasksLoaded(true);
+  }, () => { setTasksLoaded(true); setError('업무 일정을 불러오지 못했습니다. 연결 상태를 확인해 주세요.'); }), [db, workspaceId]);
+  useEffect(() => onSnapshot(query(collection(db, 'meetings'), where('workspaceId', '==', workspaceId)), snapshot => {
+    setMeetings(snapshot.docs.map(item => ({ ...item.data() as Omit<MeetingRecord, 'id'>, id: item.id })));
+    setMeetingsLoaded(true);
+  }, () => { setMeetingsLoaded(true); setError('회의 일정을 불러오지 못했습니다. 연결 상태를 확인해 주세요.'); }), [db, workspaceId]);
   useEffect(() => {
     const dialog = dialogRef.current;
-    if (openDay && dialog && !dialog.open) dialog.showModal();
+    if (meetingOpen && dialog && !dialog.open) dialog.showModal();
+    if (!meetingOpen && dialog?.open) dialog.close();
     return () => { if (dialog?.open) dialog.close(); };
-  }, [openDay]);
+  }, [meetingOpen]);
 
-  const loading = snapshotState?.workspaceId !== workspaceId;
-  const tasks = loading ? [] : snapshotState?.tasks ?? [];
-  const error = loading ? '' : snapshotState?.error ?? '';
-  const visibleTasks = tasks.filter((task) => task.status !== 'DECLINED' && (filter === 'team' || filter === 'mine' && task.assigneeId === viewerId || filter === 'review' && task.reviewRequired && task.requesterId === viewerId));
-  const weeks = buildCalendarWeeks(month.year, month.month, visibleTasks
-    .filter((task) => task.dueDate instanceof Timestamp)
-    .map((task) => {
-      const reviewRange = filter === 'review' && task.status === 'REVIEW_PENDING'
-        && task.reviewSubmittedAt instanceof Timestamp && task.reviewDeadlineAt instanceof Timestamp;
-      return {
-        id: task.id, title: reviewRange ? `검수 · ${task.title}` : task.title, status: task.status,
-        createdAt: reviewRange ? task.reviewSubmittedAt!.toDate() : task.createdAt instanceof Timestamp ? task.createdAt.toDate() : task.dueDate.toDate(),
-        dueDate: reviewRange ? task.reviewDeadlineAt!.toDate() : task.dueDate.toDate(),
-      };
-    }));
+  const events = useMemo(() => buildCalendarEvents(tasks.filter(task => task.createdAt instanceof Timestamp && task.dueDate instanceof Timestamp).map(task => ({
+    id: task.id, title: task.title, status: task.status, assigneeId: task.assigneeId, requesterId: task.requesterId,
+    reviewRequired: task.reviewRequired, reviewCycle: task.reviewCycle, createdAt: task.createdAt.toDate(), dueDate: task.dueDate.toDate(),
+    reviewSubmittedAt: task.reviewSubmittedAt instanceof Timestamp ? task.reviewSubmittedAt.toDate() : null,
+    reviewDeadlineAt: task.reviewDeadlineAt instanceof Timestamp ? task.reviewDeadlineAt.toDate() : null,
+  })), meetings.filter(meeting => meeting.startsAt instanceof Timestamp && meeting.endsAt instanceof Timestamp).map(meeting => ({
+    id: meeting.id, title: meeting.title, startsAt: meeting.startsAt.toDate(), endsAt: meeting.endsAt.toDate(),
+  })), filter, viewerId), [tasks, meetings, filter, viewerId]);
 
-  function moveMonth(offset: number) {
-    const next = new Date(Date.UTC(month.year, month.month - 1 + offset, 1));
-    setMonth({ year: next.getUTCFullYear(), month: next.getUTCMonth() + 1 });
-    setOpenDay(null);
+  async function submitMeeting(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (meetingPending) return;
+    const start = new Date(meetingStart);
+    const end = new Date(meetingEnd);
+    if (!meetingTitle.trim() || !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start <= new Date() || end <= start || end.getTime() - start.getTime() > 86_400_000) {
+      setMeetingError('미래의 시작 시각과 24시간 이내 종료 시각을 확인해 주세요.'); return;
+    }
+    setMeetingPending(true); setMeetingError('');
+    try {
+      if (!auth.currentUser) throw new Error('다시 로그인해 주세요.');
+      await getIdToken(auth.currentUser, true);
+      await httpsCallable(functions, 'createMeeting')({ workspaceId, title: meetingTitle.trim(), startsAt: start.toISOString(), endsAt: end.toISOString() });
+      setMeetingOpen(false); setMeetingTitle('');
+    } catch (reason) {
+      const code = reason && typeof reason === 'object' && 'code' in reason ? String(reason.code) : '';
+      setMeetingError(code === 'functions/permission-denied' ? '워크스페이스 멤버만 회의를 등록할 수 있습니다.' : code === 'functions/unauthenticated' ? '다시 로그인해 주세요.' : code === 'functions/invalid-argument' ? '회의 제목과 날짜를 확인해 주세요.' : '회의를 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally { setMeetingPending(false); }
   }
-
-  function showDay(day: CalendarDay, button: HTMLButtonElement) {
-    const anchor = button.getBoundingClientRect();
-    const width = Math.min(320, window.innerWidth - 24);
-    const left = Math.max(12, Math.min(anchor.left, window.innerWidth - width - 12));
-    const top = anchor.bottom + 8 + 380 <= window.innerHeight
-      ? anchor.bottom + 8 : Math.max(12, anchor.top - 388);
-    setOpenDay({ day, left, top });
+  function openMeeting() {
+    if (new Date(meetingStart) <= new Date()) {
+      setMeetingStart(inputValue(new Date(Date.now() + 60 * 60_000)));
+      setMeetingEnd(inputValue(new Date(Date.now() + 2 * 60 * 60_000)));
+    }
+    setMeetingError('');
+    setMeetingOpen(true);
   }
 
   return <section className={styles.calendarView} aria-labelledby="calendar-title">
-    <div className={styles.heading}><p className={styles.eyebrow}>SCHEDULE</p><h1 id="calendar-title">캘린더</h1><p>업무 요청일부터 마감일까지 팀 일정을 한눈에 확인하세요.</p></div>
+    <div className={styles.heading}><p className={styles.eyebrow}>SCHEDULE</p><h1 id="calendar-title">캘린더</h1><p>업무 요청일부터 마감일까지, 검수 기한과 회의까지 한눈에 확인하세요.</p></div>
     <div className={styles.controls}>
-      <div className={styles.monthControl}><button type="button" aria-label="이전 달" onClick={() => moveMonth(-1)}>‹</button><strong aria-live="polite">{month.year}년 {month.month}월</strong><button type="button" aria-label="다음 달" onClick={() => moveMonth(1)}>›</button></div>
-      <div className={styles.filters} aria-label="일정 필터">{filters.map((item) => <button key={item.id} type="button" aria-pressed={filter === item.id} className={filter === item.id ? styles.selected : ''} onClick={() => { setFilter(item.id); setOpenDay(null); }}>{item.label}</button>)}</div>
+      <div className={styles.monthControl}><button type="button" aria-label="이전 달" onClick={() => calendarRef.current?.getApi().prev()}>‹</button><strong aria-live="polite">{Number(month.slice(0, 4))}년 {Number(month.slice(5))}월</strong><button type="button" aria-label="다음 달" onClick={() => calendarRef.current?.getApi().next()}>›</button></div>
+      <div className={styles.controlRight}><div className={styles.filters} aria-label="일정 필터">{filters.map(item => <button key={item.id} type="button" aria-pressed={filter === item.id} className={filter === item.id ? styles.selected : ''} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div><button className={styles.addMeeting} type="button" onClick={openMeeting}>회의 추가</button></div>
     </div>
     {error && <p role="alert" className={styles.error}>{error}</p>}
-    {loading && <p role="status" className={styles.loading}>일정을 불러오는 중…</p>}
-    <div className={styles.calendarOuter}><div className={styles.calendar} role="grid" aria-label={`${month.year}년 ${month.month}월 업무 일정`}>
-      {weekdayLabels.map((label) => <div className={styles.weekday} role="columnheader" key={label}>{label}</div>)}
-      {weeks.map((week) => <div className={styles.week} role="row" key={week.days[0].key}>
-        {week.days.map((day) => <div className={`${styles.day} ${day.month !== month.month ? styles.other : ''}`} role="gridcell" aria-label={`${day.year}년 ${day.month}월 ${day.day}일, 업무 ${day.items.length}개`} key={day.key}>
-          <span className={day.key === todayKey ? styles.today : styles.dayNumber}>{day.day}</span>
-          <span className={styles.visuallyHidden}>{day.items.map((item) => item.title).join(', ')}</span>
-          {day.overflowCount > 0 && <button type="button" className={styles.more} aria-label={`${day.month}월 ${day.day}일 업무 ${day.items.length}개 모두 보기`} onClick={(event) => showDay(day, event.currentTarget)}>+{day.overflowCount}개 더보기</button>}
-        </div>)}
-        <div className={styles.eventRows} aria-hidden="true">
-          {week.bars.filter((bar) => bar.lane < visibleEventRows).map((bar) => <span key={bar.item.id}
-            className={`${styles.event} ${bar.item.status === 'REQUESTED' ? styles.pending : ''} ${bar.startsHere ? styles.eventStart : ''} ${bar.endsHere ? styles.eventEnd : ''}`}
-            style={{ gridColumn: `${bar.startDay + 1} / span ${bar.endDay - bar.startDay + 1}`, gridRow: bar.lane + 1 }}
-            title={`${bar.item.title} · ${dateTime.format(bar.item.createdAt)} ~ ${dateTime.format(bar.item.dueDate)}`}>{bar.item.title}</span>)}
-        </div>
-      </div>)}
-    </div></div>
-    <div className={styles.legend}><span>확정된 업무</span><span className={styles.pendingKey}>요청 대기 업무</span></div>
-    {filter === 'review' && <p className={styles.note}>검수 대기 중인 업무는 제출일부터 검수 기한까지, 그 외 검수 대상 업무는 요청일부터 업무 마감일까지 표시합니다.</p>}
-    {openDay && <dialog ref={dialogRef} className={styles.dayDialog} style={{ left: openDay.left, top: openDay.top }} aria-labelledby="calendar-day-title" onCancel={() => setOpenDay(null)} onClick={(event) => { if (event.target === event.currentTarget) setOpenDay(null); }}>
-      <div className={styles.dialogHeading}><div><small>{weekdayLabels[new Date(Date.UTC(openDay.day.year, openDay.day.month - 1, openDay.day.day)).getUTCDay()]}</small><h2 id="calendar-day-title">{openDay.day.month}월 {openDay.day.day}일</h2><p>업무 {openDay.day.items.length}개</p></div><button type="button" aria-label="일정 목록 닫기" onClick={() => setOpenDay(null)}>×</button></div>
-      <ul className={styles.dayTaskList}>{openDay.day.items.map((item) => <li key={item.id} className={item.status === 'REQUESTED' ? styles.pendingTask : ''}><strong>{item.title}</strong><span>{item.status === 'REQUESTED' ? '요청 대기' : '확정 업무'}</span><small>{dateTime.format(item.createdAt)} ~ {dateTime.format(item.dueDate)}</small></li>)}</ul>
-    </dialog>}
+    {(!tasksLoaded || !meetingsLoaded) && <p role="status" className={styles.loading}>일정을 불러오는 중…</p>}
+    <div className={styles.calendarOuter}>
+      <FullCalendar ref={calendarRef} plugins={[dayGridPlugin, classicThemePlugin]} initialView="dayGridMonth" locale={koLocale} timeZone="Asia/Seoul" headerToolbar={false} fixedWeekCount={false} dayMaxEvents={3} moreLinkClick="popover" events={events} datesSet={info => setMonth(koreanDateKey(info.view.calendar.getDate()).slice(0, 7))} eventDidMount={eventTitle} eventClass={info => `${styles.event} ${styles[info.event.extendedProps.kind as 'task' | 'review' | 'meeting']} ${info.event.extendedProps.status === 'REQUESTED' ? styles.pending : ''}`} dayCellClass={styles.dayCell} dayHeaderClass={styles.dayHeader} moreLinkClass={styles.moreLink} popoverClass={styles.popover} dayHeaderFormat={{ weekday: 'short' }} />
+    </div>
+    <div className={styles.legend}><span>확정된 업무</span><span className={styles.pendingKey}>요청 대기 업무</span><span className={styles.reviewKey}>검수 기한</span><span className={styles.meetingKey}>회의</span></div>
+    {filter === 'review' && <p className={styles.note}>검수 대기 중인 업무는 제출일부터 검수 기한까지 표시합니다.</p>}
+    <dialog ref={dialogRef} className={styles.meetingDialog} aria-labelledby="meeting-title" onCancel={() => setMeetingOpen(false)} onClick={event => { if (event.target === event.currentTarget) setMeetingOpen(false); }}>
+      <form onSubmit={submitMeeting}><div className={styles.dialogHeading}><h2 id="meeting-title">회의 추가</h2><button type="button" aria-label="회의 추가 닫기" onClick={() => setMeetingOpen(false)}>×</button></div>
+        <div className={styles.dialogBody}><label>회의 제목<input required maxLength={120} minLength={2} value={meetingTitle} onChange={event => setMeetingTitle(event.target.value)} placeholder="회의 제목" /></label><label>시작 날짜·시간<input required type="datetime-local" value={meetingStart} onChange={event => setMeetingStart(event.target.value)} /></label><label>종료 날짜·시간<input required type="datetime-local" value={meetingEnd} onChange={event => setMeetingEnd(event.target.value)} /></label>{meetingError && <p role="alert" className={styles.error}>{meetingError}</p>}</div>
+        <div className={styles.dialogActions}><button type="button" onClick={() => setMeetingOpen(false)}>취소</button><button type="submit" disabled={meetingPending}>{meetingPending ? '등록 중…' : '회의 등록'}</button></div>
+      </form>
+    </dialog>
   </section>;
 }

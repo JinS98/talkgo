@@ -8,6 +8,7 @@ import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import nodemailer from 'nodemailer';
 import { createTaskRecord } from './taskModel.js';
+import { createMeetingRecord } from './meetingModel.js';
 import { respondToTaskRequest } from './taskResponses.js';
 import { completeOverdueReviews } from './reviewTimeout.js';
 import { markReviewNotificationRead, sendReviewReminders } from './reviewNotifications.js';
@@ -23,6 +24,11 @@ const inviteLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 export const createTask = onCall({ region }, async (request) => {
   const user = await activeUser(request);
   return createTaskRecord(db, user.uid, request.data);
+});
+
+export const createMeeting = onCall({ region }, async (request) => {
+  const user = await activeUser(request);
+  return createMeetingRecord(db, user.uid, request.data);
 });
 
 export const respondTask = onCall({ region }, async (request) => {
