@@ -385,6 +385,11 @@ try {
   await ownerPage.getByRole('button', { name: '업무 보드' }).click();
   const requesterReviewCard = ownerPage.getByRole('article').filter({ hasText: '검수 요청 업무' });
   await requesterReviewCard.getByText('담당자가 검수를 요청했습니다.').waitFor();
+  await ownerPage.getByRole('button', { name: /^알림/ }).click();
+  await ownerPage.getByRole('dialog', { name: '알림 센터' }).getByText('검수 요청이 도착했습니다.').click();
+  await ownerPage.getByRole('dialog', { name: '알림 센터' }).waitFor({ state: 'hidden' });
+  const submissionNotice = (await db.collection('notifications').where('taskId', '==', reviewTask.id).where('type', '==', 'REVIEW_SUBMITTED').get()).docs[0];
+  assert.ok(submissionNotice.get('readAt'), 'Opening a notification must mark it read.');
   await requesterReviewCard.getByText(/검수 기한/).first().waitFor();
   await requesterReviewCard.getByRole('button', { name: '이력 보기' }).click();
   await requesterReviewCard.getByText('검수 요청 제출', { exact: true }).waitFor();
@@ -414,6 +419,11 @@ try {
   await timeoutCard.getByText('검수 기한 경과 자동 완료').waitFor();
   await timeoutCard.getByText(/^시스템 ·/).waitFor();
   await memberPage.getByRole('article').filter({ hasText: '검수 자동 완료 화면 확인' }).getByText('검수 기한이 지나 자동 완료되었습니다.').waitFor();
+  await memberPage.getByRole('button', { name: /^알림/ }).click();
+  await memberPage.getByRole('dialog', { name: '알림 센터' }).getByText('검수 기한이 지나 업무가 자동 완료되었습니다.').click();
+  await memberPage.getByRole('dialog', { name: '알림 센터' }).waitFor({ state: 'hidden' });
+  const completionNotice = (await db.collection('notifications').where('taskId', '==', timeoutRef.id).where('recipientId', '==', member.uid).get()).docs[0];
+  assert.ok(completionNotice.get('readAt'), 'The assignee must receive and read timeout completion.');
   const noReviewTaskCard = memberPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
   await noReviewTaskCard.getByRole('button', { name: '완료하기' }).click();
   await noReviewTaskCard.getByText('검수 없이 완료한 업무입니다.').waitFor();
@@ -464,7 +474,7 @@ try {
   await ownerPage.keyboard.press('Escape');
   await dayDialog.waitFor({ state: 'hidden' });
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions verified task progress, review, live messages, and calendar overflow.');
+  console.log('PASS: two Chrome sessions verified task progress, review notifications, live messages, and calendar overflow.');
 } finally {
   await browser?.close();
   await vite?.close();

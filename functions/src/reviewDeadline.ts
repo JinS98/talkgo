@@ -28,8 +28,16 @@ export function calculateReviewDeadline(submittedAt: Date, reviewWorkingDays: nu
   if (!Number.isFinite(submittedAt.getTime()) || !Number.isInteger(reviewWorkingDays) || reviewWorkingDays < 1 || reviewWorkingDays > 10) {
     throw new RangeError('제출 시각과 1~10근무일의 검수 기간이 필요합니다.');
   }
-  let remaining = reviewWorkingDays * 8 * hour;
-  let cursor = submittedAt.getTime();
+  return calculateWorkingHoursDeadline(submittedAt, reviewWorkingDays * 8);
+}
+
+/** Find the instant after the requested number of Korean office hours. */
+export function calculateWorkingHoursDeadline(startedAt: Date, workingHours: number): Date {
+  if (!Number.isFinite(startedAt.getTime()) || !Number.isFinite(workingHours) || workingHours <= 0 || workingHours > 80) {
+    throw new RangeError('올바른 시작 시각과 근무시간이 필요합니다.');
+  }
+  let remaining = workingHours * hour;
+  let cursor = startedAt.getTime();
   for (let dayOffset = 0; dayOffset < 60; dayOffset += 1) {
     const local = seoulDate(cursor);
     const year = local.getUTCFullYear();

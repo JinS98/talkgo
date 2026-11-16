@@ -22,6 +22,7 @@
     "test:calendar": "node --disable-warning=ExperimentalWarning --experimental-strip-types apps/web/scripts/verify-calendar-layout.mjs",
     "test:review-deadline": "npm run build:functions && node functions/scripts/verify-review-deadline.mjs",
     "test:review-timeout": "npm run build:functions && firebase emulators:exec --only firestore --project demo-taskgo \"node functions/scripts/verify-review-timeout.mjs\"",
+    "test:review-notifications": "npm run build:functions && firebase emulators:exec --only firestore --project demo-taskgo \"node functions/scripts/verify-review-notifications.mjs\"",
     "test:chat": "npm run verify:chat -w @taskgo/web",
     "build:socket": "npm run build -w @taskgo/socket-server",
     "dev:socket": "npm run dev -w @taskgo/socket-server",

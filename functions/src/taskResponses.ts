@@ -2,6 +2,7 @@ import { type Firestore, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { RespondToTaskRequest, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
 import { calculateReviewDeadline } from './reviewDeadline.js';
+import { writeReviewNotification } from './reviewNotifications.js';
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const actions = new Set<TaskRequestAction>(['accept', 'decline', 'startProgress', 'proposeDueDate', 'approveDueDate', 'rejectDueDate', 'submitForReview', 'complete', 'approveReview', 'rejectReview', 'resubmitForReview']);
@@ -170,6 +171,16 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
       createdAt: now,
       metadata,
     });
+    const notificationType = input.action === 'submitForReview' || input.action === 'resubmitForReview' ? 'REVIEW_SUBMITTED'
+      : input.action === 'approveReview' || input.action === 'complete' ? 'REVIEW_COMPLETED' : null;
+    if (notificationType) {
+      const recipientId = input.action === 'approveReview' ? assigneeId : requesterId;
+      writeReviewNotification(transaction, db, {
+        taskId: input.taskId, workspaceId, recipientId, reviewCycle: input.action === 'submitForReview' ? 1 : input.action === 'resubmitForReview' ? reviewCycle + 1 : reviewCycle,
+        type: notificationType, title: task.get('title'), at: now,
+        ...(input.action === 'approveReview' ? { completionReason: 'APPROVED' } : input.action === 'complete' ? { completionReason: 'NO_REVIEW' } : {}),
+      });
+    }
     return { taskId: input.taskId, status, dueDate: due.toDate().toISOString(), proposedDueDate: proposed?.toDate().toISOString() ?? null };
   });
 }

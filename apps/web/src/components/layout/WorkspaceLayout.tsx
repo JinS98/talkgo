@@ -14,6 +14,7 @@ interface WorkspaceLayoutProps {
   children: ReactNode;
   workspaceControls?: ReactNode;
   accountControls?: ReactNode;
+  notificationControls?: ReactNode;
   workspaceName?: string;
   canManageWorkspace?: boolean;
   liveChat?: boolean;
@@ -38,7 +39,7 @@ function NavigationIcon({ view }: { view: AppView }) {
   return <span className={styles.navIcon}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[view]}</svg></span>;
 }
 
-export function WorkspaceLayout({ children, workspaceControls, accountControls, workspaceName, canManageWorkspace = false, liveChat = false, channels, directMessages, conversationError }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ children, workspaceControls, accountControls, notificationControls, workspaceName, canManageWorkspace = false, liveChat = false, channels, directMessages, conversationError }: WorkspaceLayoutProps) {
   const mainRef = useRef<HTMLElement>(null);
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
@@ -128,6 +129,7 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
         <header className={styles.topbar}>
           <div className={styles.topbarContext}><span className={styles.topbarTitle}>{currentTitle}</span>{!liveChat && activeView !== 'workspace' && <span className={styles.previewBadge}>샘플 화면</span>}</div>
           <div className={styles.topbarActions}>
+            {notificationControls}
             {accountControls}
           </div>
         </header>

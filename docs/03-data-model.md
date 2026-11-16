@@ -12,7 +12,7 @@
 - `messages/{messageId}`: workspaceId, sourceType(channel/dm), channelId 또는 dmRoomId, senderId, clientMessageId, content, createdAt. 서버가 사용자 UID와 `clientMessageId`로 결정한 ID에 트랜잭션으로 한 번만 생성한다. `createdAt`은 소켓 서버가 생성한 Firestore Timestamp다. 같은 사용자의 클라이언트 ID는 룸과 워크스페이스를 통틀어 고유해야 한다.
 - `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType(channel/dm), title, description, requesterId, createdById, assigneeId, dueDate, proposedDueDate, estimatedMinutes, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewSubmittedAt, reviewRejectionReason, reviewDeadlineAt, completionReason, createdAt, updatedAt. 날짜 필드는 Firestore Timestamp이며, 미확정 값은 null이다. 기존 업무에는 `createdById`가 없을 수 있다. 타입 계약은 `shared/contracts/src/task.ts`에 둔다.
 - `taskEvents/{eventId}`: taskId, actorId, action, createdAt, metadata
-- `notifications/{id}`: recipientId, taskId, reviewCycle, type, scheduledAt, sentAt
+- `notifications/{id}`: workspaceId, recipientId, taskId, reviewCycle, type(REVIEW_SUBMITTED/REVIEW_8H/REVIEW_2H/REVIEW_COMPLETED), title, completionReason(완료 시), createdAt, sentAt, readAt. 문서 ID는 업무·회차·종류·수신자 조합의 SHA-256 해시다. 제목과 상태만 저장하며 원본 채팅·DM 본문은 포함하지 않는다.
 - `meetings/{id}`: workspaceId, title, startsAt, endsAt
 
 메시지 내역은 `workspaceId`·`sourceType`·`channelId` 또는 `dmRoomId`로 룸을 제한하고, `createdAt`과 문서 ID의 내림차순으로 30개씩 조회한다. 동시각 메시지도 문서 ID로 정렬이 고정된다. 필요한 채널·DM 복합 인덱스는 `firestore.indexes.json`에 정의한다. 클라이언트의 직접 쓰기 금지와 룸별 읽기 권한은 Firestore 규칙에서 유지한다.
@@ -55,6 +55,12 @@
 - `completeExpiredReviews` 예약 함수는 `status=REVIEW_PENDING`과 `reviewDeadlineAt<=현재 시각`인 업무를 인덱스로 조회한다. 로컬 `dev:all`도 같은 함수를 주기적으로 실행한다.
 - 각 업무를 트랜잭션에서 다시 읽어 상태·검수 필요 여부·회차·제출 시각·기한을 확인한다. 유효하면 `DONE`, `completionReason=REVIEW_TIMEOUT`, `reviewDeadlineAt=null`로 바꾸고 `actorId=system`, `action=autoCompleteReview` 이력을 같은 트랜잭션에 추가한다.
 - 요청자의 승인·반려는 현재 검수 기한을 넘기면 거부한다. 이미 완료하거나 재제출한 업무를 이전 회차의 예약 실행이 다시 처리하지 않는다.
+
+## 검수 알림 (26일차)
+
+- 제출·재제출은 요청자에게, 검수 승인 완료는 담당자에게, 기한 자동 완료는 요청자와 담당자에게 알림을 업무 상태 변경과 같은 트랜잭션에서 생성한다. 검수 없는 업무의 완료는 요청자에게 알린다.
+- 예약 작업은 현재 시각부터 남은 서울 근무시간이 8시간 이내 또는 2시간 이내인 검수 대기 업무를 조회한다. 상태·회차·제출 시각·기한을 다시 확인하고 회차별 고정 ID가 없을 때만 알린다. 2시간 이내에 처음 발견한 업무는 2시간 알림만 생성한다.
+- 알림 센터는 현재 워크스페이스의 본인 알림 최근 50개를 실시간으로 읽는다. 현재 멤버십도 확인한다. 클라이언트 직접 쓰기는 금지하며 `markNotificationRead` 함수가 멤버인 수신자만 `readAt`을 기록한다. 앱 내부 알림이며 이메일·브라우저 푸시는 포함하지 않는다.
 
 ## 권한
 - 워크스페이스 장만 초대를 발송·철회·조회한다. 초대 수락은 서버 트랜잭션에서 로그인 이메일과 초대 이메일의 일치·토큰 해시·만료·사용 여부·멤버십 중복을 검증하고 멤버십·목록 미러·초대 상태를 한 번에 기록한다. 초대 기한은 7일이다.

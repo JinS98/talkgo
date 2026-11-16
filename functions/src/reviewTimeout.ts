@@ -1,4 +1,5 @@
 import { type DocumentSnapshot, type Firestore, Timestamp } from 'firebase-admin/firestore';
+import { writeReviewNotification } from './reviewNotifications.js';
 
 const pageSize = 100;
 const maxPages = 20;
@@ -42,6 +43,15 @@ export async function completeOverdueReview(db: Firestore, candidate: ReviewTime
       createdAt: now,
       metadata: { automatic: true, completionReason: 'REVIEW_TIMEOUT', reviewCycle: candidate.reviewCycle, reviewDeadlineAt: deadline.toDate().toISOString() },
     });
+    const recipients = new Set([task.get('requesterId'), task.get('assigneeId')]);
+    for (const recipientId of recipients) {
+      if (typeof recipientId !== 'string' || !recipientId) continue;
+      writeReviewNotification(transaction, db, {
+        taskId: candidate.taskId, workspaceId: task.get('workspaceId'), recipientId,
+        reviewCycle: candidate.reviewCycle, type: 'REVIEW_COMPLETED', title: task.get('title'),
+        at: now, completionReason: 'REVIEW_TIMEOUT',
+      });
+    }
     return true;
   });
 }

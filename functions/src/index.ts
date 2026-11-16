@@ -10,6 +10,7 @@ import nodemailer from 'nodemailer';
 import { createTaskRecord } from './taskModel.js';
 import { respondToTaskRequest } from './taskResponses.js';
 import { completeOverdueReviews } from './reviewTimeout.js';
+import { markReviewNotificationRead, sendReviewReminders } from './reviewNotifications.js';
 import { localTaskCandidates, openAiTaskCandidates, suggestTaskFromMessage } from './taskSuggestions.js';
 
 initializeApp();
@@ -33,6 +34,17 @@ export const completeExpiredReviews = onSchedule({ schedule: 'every 1 minutes', 
   const result = await completeOverdueReviews(db);
   if (result.completed || result.skipped || result.hasMore) logger.info('Review timeout sweep', result);
   if (result.hasMore) logger.warn('Review timeout backlog remains for the next scheduled run', result);
+  const reminders = await sendReviewReminders(db);
+  if (reminders.sent) logger.info('Review reminders', reminders);
+});
+
+export const markNotificationRead = onCall({ region }, async (request) => {
+  const user = await activeUser(request);
+  if (!request.data || typeof request.data !== 'object' || Array.isArray(request.data) || Object.keys(request.data).length !== 1) {
+    throw new HttpsError('invalid-argument', '알림 ID를 확인해 주세요.');
+  }
+  await markReviewNotificationRead(db, user.uid, request.data.notificationId);
+  return { notificationId: request.data.notificationId };
 });
 
 export const suggestTask = onCall({ region, secrets: [taskAiKey], timeoutSeconds: 30 }, async (request) => {

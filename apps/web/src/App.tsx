@@ -6,6 +6,7 @@ import { WorkspaceLayout } from './components/layout/WorkspaceLayout';
 import { ChatPanel } from './features/chat/ChatPanel';
 import { LiveChatPanel } from './features/chat/LiveChatPanel';
 import { TaskBoardPanel } from './features/tasks/TaskBoardPanel';
+import { NotificationCenter } from './features/notifications/NotificationCenter';
 import { TaskCalendarPanel } from './features/tasks/TaskCalendarPanel';
 import { defaultChannelId, type ConversationSelection } from './features/chat/demoConversations';
 import { useWorkspaceConversations } from './features/chat/useWorkspaceConversations';
@@ -53,7 +54,7 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   const currentView = activeView === 'board' || activeView === 'calendar' ? viewCopy[activeView] : null;
 
   return (
-    <WorkspaceLayout workspaceControls={workspaceControls} accountControls={accountControls} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} conversationError={conversationError}>
+    <WorkspaceLayout workspaceControls={workspaceControls} accountControls={accountControls} notificationControls={liveChat && auth && db && functions && workspaceId && userId ? <NotificationCenter key={`${workspaceId}:${userId}`} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} /> : null} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} conversationError={conversationError}>
       {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? liveChat && auth && functions && workspaceId && userId
         ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} memberNames={memberNames} />
         : <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : activeView === 'board' && liveChat && auth && db && functions && workspaceId && userId

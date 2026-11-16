@@ -125,7 +125,7 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow get, list: if signedIn() && resource.data.recipientId == request.auth.uid;
+      allow get, list: if signedIn() && resource.data.recipientId == request.auth.uid && isMember(resource.data.workspaceId);
       allow write: if false;
     }
 
