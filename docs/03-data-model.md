@@ -15,6 +15,8 @@
 - `notifications/{id}`: workspaceId, recipientId, taskId, reviewCycle, type(REVIEW_SUBMITTED/REVIEW_8H/REVIEW_2H/REVIEW_COMPLETED), title, completionReason(완료 시), createdAt, sentAt, readAt. 문서 ID는 업무·회차·종류·수신자 조합의 SHA-256 해시다. 제목과 상태만 저장하며 원본 채팅·DM 본문은 포함하지 않는다.
 - `meetings/{id}`: workspaceId, title, startsAt, endsAt
 
+업무 보드는 워크스페이스 멤버가 같은 `tasks` 문서를 실시간으로 읽어 요청 대기·수락/진행·완료/거절 열로 나눈다. 내 담당·내가 요청한 업무 범위와 제목 검색은 클라이언트 표시 필터이며 서버 데이터와 권한을 바꾸지 않는다. 카드에는 공개 업무 메타데이터만 표시하고 원본 채팅/DM 본문은 조회하지 않는다.
+
 메시지 내역은 `workspaceId`·`sourceType`·`channelId` 또는 `dmRoomId`로 룸을 제한하고, `createdAt`과 문서 ID의 내림차순으로 30개씩 조회한다. 동시각 메시지도 문서 ID로 정렬이 고정된다. 필요한 채널·DM 복합 인덱스는 `firestore.indexes.json`에 정의한다. 클라이언트의 직접 쓰기 금지와 룸별 읽기 권한은 Firestore 규칙에서 유지한다.
 
 ## 업무 생성 스키마 (17일차)

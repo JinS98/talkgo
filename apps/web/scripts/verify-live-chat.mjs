@@ -248,6 +248,18 @@ try {
   const memberTaskCard = memberPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
   await memberTaskCard.getByText('요청 테스트 방장').waitFor();
   await memberTaskCard.getByText('담당 테스트 멤버').waitFor();
+  await memberTaskCard.getByText('등록 테스트 방장').waitFor();
+  await memberPage.getByRole('region', { name: '요청 대기' }).getByRole('article').filter({ hasText: '고객 요청 정리' }).waitFor();
+  await memberPage.getByRole('button', { name: '내 담당 업무' }).click();
+  await memberTaskCard.waitFor();
+  await memberPage.getByRole('button', { name: '내가 요청한 업무' }).click();
+  await memberPage.getByText('조건에 맞는 업무가 없습니다. 범위나 검색어를 바꿔 보세요.').waitFor();
+  await memberPage.getByRole('button', { name: '팀 전체' }).click();
+  await memberPage.getByRole('searchbox', { name: '업무 제목 검색' }).fill('없는 제목');
+  await memberTaskCard.waitFor({ state: 'hidden' });
+  await memberPage.getByRole('searchbox', { name: '업무 제목 검색' }).fill('고객 요청');
+  await memberTaskCard.waitFor();
+  await memberPage.getByRole('searchbox', { name: '업무 제목 검색' }).fill('');
   assert.equal(await memberTaskCard.getByText(/@example\.com/).count(), 0);
   await memberTaskCard.getByRole('button', { name: '마감 변경 제안' }).click();
   const proposedLocal = await memberPage.evaluate(() => {
@@ -260,10 +272,17 @@ try {
   assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('dueDate').toDate().toISOString(), channelTasks.docs[0].get('dueDate').toDate().toISOString(), 'Proposing must preserve the original due date.');
   await ownerPage.getByRole('button', { name: '업무 보드' }).click();
   const ownerTaskCard = ownerPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
+  await ownerTaskCard.waitFor();
+  await ownerPage.getByRole('button', { name: '내 담당 업무' }).click();
+  await ownerTaskCard.waitFor({ state: 'hidden' });
+  await ownerPage.getByRole('button', { name: '내가 요청한 업무' }).click();
+  await ownerTaskCard.waitFor();
+  await ownerPage.getByRole('button', { name: '팀 전체' }).click();
   await ownerTaskCard.getByRole('button', { name: '변경 승인' }).click();
   await ownerTaskCard.getByText('제안된 마감').waitFor({ state: 'hidden' });
   await memberTaskCard.getByRole('button', { name: '수락', exact: true }).click();
   await memberTaskCard.getByText('수락됨', { exact: true }).waitFor();
+  await memberPage.getByRole('region', { name: '수락·진행' }).getByRole('article').filter({ hasText: '고객 요청 정리' }).waitFor();
   assert.equal((await db.doc(`tasks/${channelTasks.docs[0].id}`).get()).get('status'), 'ACCEPTED');
   await memberTaskCard.getByRole('button', { name: '진행 시작' }).click();
   await memberTaskCard.getByText('진행 중', { exact: true }).waitFor();
@@ -474,7 +493,7 @@ try {
   await ownerPage.keyboard.press('Escape');
   await dayDialog.waitFor({ state: 'hidden' });
   assert.deepEqual(browserErrors, []);
-  console.log('PASS: two Chrome sessions verified task progress, review notifications, live messages, and calendar overflow.');
+  console.log('PASS: two Chrome sessions verified board scopes, search, task progress, review notifications, live messages, and calendar overflow.');
 } finally {
   await browser?.close();
   await vite?.close();
