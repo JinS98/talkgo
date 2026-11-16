@@ -130,6 +130,10 @@ async function main() {
   const emulator = start('Firebase 에뮬레이터', emulatorArgs, { env: emulatorEnv });
   await waitFor('Firebase 에뮬레이터', async () => (await Promise.all([9099, 8080, 5001].map((port) => occupied(port, '127.0.0.1')))).every(Boolean), emulator);
 
+  start('검수 자동 완료', [resolve(root, 'scripts/review-timeout-local.mjs')], {
+    env: { ...process.env, FIREBASE_PROJECT_ID: 'demo-taskgo', FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080' },
+  });
+
   const socket = start('채팅 서버', [resolve(root, 'apps/socket-server/dist/index.js')], {
     env: {
       ...process.env,

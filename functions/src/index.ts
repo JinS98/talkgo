@@ -5,9 +5,11 @@ import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { defineSecret } from 'firebase-functions/params';
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import nodemailer from 'nodemailer';
 import { createTaskRecord } from './taskModel.js';
 import { respondToTaskRequest } from './taskResponses.js';
+import { completeOverdueReviews } from './reviewTimeout.js';
 import { localTaskCandidates, openAiTaskCandidates, suggestTaskFromMessage } from './taskSuggestions.js';
 
 initializeApp();
@@ -25,6 +27,12 @@ export const createTask = onCall({ region }, async (request) => {
 export const respondTask = onCall({ region }, async (request) => {
   const user = await activeUser(request);
   return respondToTaskRequest(db, user.uid, request.data);
+});
+
+export const completeExpiredReviews = onSchedule({ schedule: 'every 1 minutes', region, timeZone: 'Asia/Seoul', timeoutSeconds: 300 }, async () => {
+  const result = await completeOverdueReviews(db);
+  if (result.completed || result.skipped || result.hasMore) logger.info('Review timeout sweep', result);
+  if (result.hasMore) logger.warn('Review timeout backlog remains for the next scheduled run', result);
 });
 
 export const suggestTask = onCall({ region, secrets: [taskAiKey], timeoutSeconds: 30 }, async (request) => {

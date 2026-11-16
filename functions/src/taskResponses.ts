@@ -122,6 +122,12 @@ export async function respondToTaskRequest(db: Firestore, actorId: string, value
     }
 
     const now = Timestamp.now();
+    if (input.action === 'approveReview' || input.action === 'rejectReview') {
+      const deadline = task.get('reviewDeadlineAt');
+      if (deadline != null && (!(deadline instanceof Timestamp) || deadline.toMillis() <= now.toMillis())) {
+        throw new HttpsError('failed-precondition', '검수 기한이 지났습니다. 자동 완료 처리를 기다려 주세요.');
+      }
+    }
     const reviewDeadline = input.action === 'submitForReview' || input.action === 'resubmitForReview'
       ? Timestamp.fromDate(calculateReviewDeadline(now.toDate(), reviewDays as number)) : null;
     const updates: { updatedAt: Timestamp; status?: TaskStatus; proposedDueDate?: Timestamp | null; dueDate?: Timestamp; reviewCycle?: number; reviewSubmittedAt?: Timestamp; reviewDeadlineAt?: Timestamp | null; reviewRejectionReason?: string | null; completionReason?: 'APPROVED' | 'NO_REVIEW' } = { updatedAt: now };

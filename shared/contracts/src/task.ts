@@ -16,6 +16,7 @@ export interface CreateTaskRequest {
 }
 
 export type TaskRequestAction = 'accept' | 'decline' | 'startProgress' | 'proposeDueDate' | 'approveDueDate' | 'rejectDueDate' | 'submitForReview' | 'complete' | 'approveReview' | 'rejectReview' | 'resubmitForReview';
+export type TaskEventAction = TaskRequestAction | 'autoCompleteReview';
 
 export interface RespondToTaskRequest {
   taskId: string;
@@ -27,7 +28,7 @@ export interface RespondToTaskRequest {
 export interface TaskEventRecord<TimestampValue> {
   taskId: string;
   actorId: string;
-  action: TaskRequestAction;
+  action: TaskEventAction;
   createdAt: TimestampValue;
   metadata: {
     automatic?: boolean;

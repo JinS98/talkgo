@@ -4,13 +4,13 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 23일차 검수 승인·재작업 완료(로컬 에뮬레이터 기준).** 채널·DM 메시지에서 업무를 요청하고, 담당자가 수락·진행 시작·마감 변경을 제안할 수 있습니다. 검수 대상 업무는 제출→요청자 승인 또는 사유 있는 반려→재제출 흐름을 지원합니다. 검수 없는 업무는 담당자가 완료합니다. 캘린더는 실제 업무 마감일을 실시간으로 표시합니다. 초대 메일의 실제 발송과 Functions 배포는 SMTP·Blaze 설정 전입니다.
+> **현재 상태: 25일차 검수 기한 자동 완료 구현(로컬 에뮬레이터 기준).** 채널·DM 메시지에서 업무를 요청하고, 담당자가 수락·진행 시작·마감 변경을 제안할 수 있습니다. 검수 대상 업무는 제출→요청자 승인 또는 사유 있는 반려→재제출 흐름을 지원하며, 기한이 지나면 자동 완료됩니다. 검수 없는 업무는 담당자가 완료합니다. 캘린더는 실제 업무 마감일을 실시간으로 표시합니다. 초대 메일의 실제 발송과 Functions·예약 작업 배포는 SMTP·Blaze 설정 전입니다.
 
 ## 기술 구성
 - Web: React + TypeScript + Vite + SCSS Modules + Zustand
 - 실시간 채팅: Node.js + Socket.io (Cloud Run 예정)
 - 인증/DB: Firebase Auth + Cloud Firestore
-- 서버 로직: Cloud Functions (워크스페이스·초대·업무 생성·요청 응답), 예약 작업 (예정)
+- 서버 로직: Cloud Functions (워크스페이스·초대·업무 생성·요청 응답·검수 기한 예약 작업)
 - 개발: Firebase Emulator Suite, 로컬 Socket.io
 
 ## 실행
@@ -37,6 +37,8 @@ Auth·Firestore 에뮬레이터를 실행한 뒤 `npm run dev:socket:emulator`�
 `npm run test:task-model`은 별도 Auth·Firestore·Functions 에뮬레이터에서 업무 스키마·권한·DM 원문 보호, 요청·진행 상태 전이와 이력 접근 권한을 확인합니다. 기본 포트를 사용하므로 `npm run dev:all`을 종료한 뒤 실행하세요. 요청 필드와 상태 정책은 [데이터 모델](docs/03-data-model.md)에 정리했습니다.
 
 `npm run test:review-deadline`은 에뮬레이터 없이 서울 근무시간·공휴일·대체공휴일을 적용한 검수 기한 계산을 확인합니다. 공식 임시공휴일이나 선거일이 새로 지정되면 [검수 정책](docs/05-task-review-policy.md)의 공휴일 데이터를 갱신해야 합니다.
+
+`npm run test:review-timeout`은 Firestore 에뮬레이터에서 기한 초과·중복 실행·검수 회차·승인/반려 경합을 확인합니다. 기본 에뮬레이터 포트를 사용하므로 `dev:all`을 종료한 뒤 실행하세요. `npm run dev:all`에는 검수 기한 자동 완료 반복 실행기가 포함되며 약 1분마다 기한을 확인합니다. 배포 환경의 `completeExpiredReviews` 예약 함수도 1분마다 실행됩니다. Cloud Scheduler를 사용하려면 Firebase 프로젝트의 요금제와 함수 배포 설정이 필요합니다. 실제 프로젝트에는 아직 배포하지 않았습니다.
 
 ## Firebase 개발 환경
 

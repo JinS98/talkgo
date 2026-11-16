@@ -8,6 +8,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { chromium } from 'playwright-core';
 import { createServer as createViteServer } from 'vite';
+import { completeOverdueReviews } from '../../../functions/lib/reviewTimeout.js';
 
 const projectId = 'demo-taskgo';
 assert.equal(process.env.GCLOUD_PROJECT, projectId, 'Run with the demo-taskgo Firebase emulators.');
@@ -403,6 +404,16 @@ try {
   await requesterReviewCard.getByRole('button', { name: '검수 승인' }).click();
   await requesterReviewCard.getByText('요청자가 검수를 승인했습니다.').waitFor();
   assert.equal((await db.doc(`tasks/${reviewTask.id}`).get()).get('completionReason'), 'APPROVED');
+  const timeoutRef = db.collection('tasks').doc();
+  await timeoutRef.set({ ...reviewTask.data(), title: '검수 자동 완료 화면 확인', reviewSubmittedAt: Timestamp.fromMillis(Date.now() - 120000), reviewDeadlineAt: Timestamp.fromMillis(Date.now() - 60000), updatedAt: Timestamp.now() });
+  const timeoutCard = ownerPage.getByRole('article').filter({ hasText: '검수 자동 완료 화면 확인' });
+  await timeoutCard.getByText('검수 요청됨', { exact: true }).waitFor();
+  assert.equal((await completeOverdueReviews(db)).completed, 1);
+  await timeoutCard.getByText('검수 기한이 지나 자동 완료되었습니다.').waitFor();
+  await timeoutCard.getByRole('button', { name: '이력 보기' }).click();
+  await timeoutCard.getByText('검수 기한 경과 자동 완료').waitFor();
+  await timeoutCard.getByText(/^시스템 ·/).waitFor();
+  await memberPage.getByRole('article').filter({ hasText: '검수 자동 완료 화면 확인' }).getByText('검수 기한이 지나 자동 완료되었습니다.').waitFor();
   const noReviewTaskCard = memberPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
   await noReviewTaskCard.getByRole('button', { name: '완료하기' }).click();
   await noReviewTaskCard.getByText('검수 없이 완료한 업무입니다.').waitFor();

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Auth } from 'firebase/auth';
 import { collection, onSnapshot, query, Timestamp, where, type Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
-import type { TaskEventRecord, TaskRecord, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
+import type { TaskEventAction, TaskEventRecord, TaskRecord, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
 import { respondTask, taskResponseError } from './taskResponseApi';
 import styles from './TaskBoardPanel.module.scss';
 
@@ -17,11 +17,11 @@ const statusLabels: Record<TaskStatus, string> = {
   REQUESTED: '요청 대기', ACCEPTED: '수락됨', IN_PROGRESS: '진행 중',
   REVIEW_PENDING: '검수 대기', REWORK: '재작업', DECLINED: '거절됨', DONE: '완료',
 };
-const eventLabels: Record<TaskRequestAction, string> = {
+const eventLabels: Record<TaskEventAction, string> = {
   accept: '업무 요청 수락', decline: '업무 요청 거절', startProgress: '업무 진행 시작',
   proposeDueDate: '마감 변경 제안', approveDueDate: '마감 변경 승인', rejectDueDate: '마감 변경 거절',
   submitForReview: '검수 요청 제출',
-  complete: '업무 완료', approveReview: '검수 승인', rejectReview: '검수 반려', resubmitForReview: '검수 재제출',
+  complete: '업무 완료', approveReview: '검수 승인', rejectReview: '검수 반려', resubmitForReview: '검수 재제출', autoCompleteReview: '검수 기한 경과 자동 완료',
 };
 
 function formatDate(value: Timestamp | null): string {
@@ -49,13 +49,14 @@ function TaskHistory({ db, task, memberNames }: { db: Firestore; task: BoardTask
       <li><span>업무 요청 생성</span><small>{memberNames[task.createdById ?? task.requesterId] ?? '멤버'} · {formatDate(task.createdAt)}</small></li>
       {state.events.map((event) => <li key={event.id}>
         <span>{event.action === 'accept' && event.metadata.automatic ? '본인 담당 업무 자동 수락' : eventLabels[event.action] ?? event.action}</span>
-        <small>{memberNames[event.actorId] ?? '멤버'} · {formatDate(event.createdAt)}</small>
+        <small>{event.action === 'autoCompleteReview' ? '시스템' : memberNames[event.actorId] ?? '멤버'} · {formatDate(event.createdAt)}</small>
         {event.action === 'proposeDueDate' && event.metadata.proposedDueDate && <small>제안 {formatDate(Timestamp.fromDate(new Date(event.metadata.proposedDueDate)))}</small>}
         {event.action === 'approveDueDate' && event.metadata.dueDate && <small>확정 {formatDate(Timestamp.fromDate(new Date(event.metadata.dueDate)))}</small>}
         {event.action === 'submitForReview' && event.metadata.reviewWorkingDays && <small>검수 기간 {event.metadata.reviewWorkingDays}근무일 · {event.metadata.reviewCycle}회차</small>}
         {event.action === 'resubmitForReview' && event.metadata.reviewWorkingDays && <small>검수 기간 {event.metadata.reviewWorkingDays}근무일 · {event.metadata.reviewCycle}회차</small>}
         {(event.action === 'submitForReview' || event.action === 'resubmitForReview') && event.metadata.reviewDeadlineAt && <small>검수 기한 {formatDate(Timestamp.fromDate(new Date(event.metadata.reviewDeadlineAt)))}</small>}
         {event.action === 'rejectReview' && event.metadata.rejectionReason && <small>사유: {event.metadata.rejectionReason}</small>}
+        {event.action === 'autoCompleteReview' && event.metadata.reviewCycle && <small>{event.metadata.reviewCycle}회차 검수 기한 경과</small>}
       </li>)}
     </ol>}
   </div>;
@@ -115,7 +116,7 @@ function TaskCard({ task, auth, db, functions, viewerId, memberNames, onNotice }
     {task.proposedDueDate && <div className={styles.proposal}><strong>제안된 마감</strong><span>{formatDate(task.proposedDueDate)}</span><small>요청자가 승인하기 전까지 기존 마감일이 유지됩니다.</small></div>}
     {task.status === 'REVIEW_PENDING' && <div className={styles.reviewInfo}><strong>검수 요청됨</strong><span>{isRequester ? '담당자가 검수를 요청했습니다.' : '요청자의 검수를 기다리는 중입니다.'}</span><small>{task.reviewSubmittedAt && `제출 ${formatDate(task.reviewSubmittedAt)} · `}{task.reviewDeadlineAt ? `검수 기한 ${formatDate(task.reviewDeadlineAt)}` : `검수 기간 ${task.reviewWorkingDays}근무일`}</small></div>}
     {task.status === 'REWORK' && <div className={`${styles.reviewInfo} ${styles.reworkInfo}`}><strong>재작업 요청됨</strong><span>{task.reviewRejectionReason ?? '요청자의 반려 사유를 확인해 주세요.'}</span><small>{task.reviewCycle}회차 검수 반려</small></div>}
-    {task.status === 'DONE' && <div className={styles.reviewInfo}><strong>완료됨</strong><span>{task.completionReason === 'APPROVED' ? '요청자가 검수를 승인했습니다.' : '검수 없이 완료한 업무입니다.'}</span></div>}
+    {task.status === 'DONE' && <div className={styles.reviewInfo}><strong>완료됨</strong><span>{task.completionReason === 'APPROVED' ? '요청자가 검수를 승인했습니다.' : task.completionReason === 'REVIEW_TIMEOUT' ? '검수 기한이 지나 자동 완료되었습니다.' : '검수 없이 완료한 업무입니다.'}</span></div>}
     {isAssignee && negotiable && <div className={styles.actions}>
       {requested && !task.proposedDueDate && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('accept')}>수락</button>}
       {task.status === 'ACCEPTED' && <button type="button" className={styles.primary} disabled={pending} onClick={() => void act('startProgress')}>진행 시작</button>}

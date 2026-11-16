@@ -48,7 +48,13 @@
 - 검수 미선택 업무는 담당자가 `IN_PROGRESS`에서 `complete`를 호출해 `DONE`으로 완료한다. `completionReason`은 `NO_REVIEW`다. 마감 변경 제안이 남아 있으면 완료할 수 없다.
 - 검수 대기(`REVIEW_PENDING`) 업무는 요청자만 승인 또는 사유를 포함해 반려한다. `approveReview`는 `DONE`과 `completionReason=APPROVED`로, `rejectReview`는 `REWORK`와 `reviewRejectionReason`으로 기록한다. 반려 사유는 공백을 제외해 2~1000자로 검증한다.
 - 담당자만 `REWORK`에서 `resubmitForReview`를 호출할 수 있다. 재제출 시 `REVIEW_PENDING`으로 돌아가 검수 회차를 올리고 제출 시각을 갱신하며 반려 사유를 지운다. 이후 요청자는 다시 승인·반려할 수 있다. 모든 전이와 이력 이벤트는 같은 트랜잭션으로 저장한다.
-- 검수 회차는 향후 예약 알림 구분에 사용한다. 예약 알림과 자동 완료는 아직 연결되지 않았으며 25일차 이후 범위다.
+- 검수 회차는 예약 자동 완료에서 이전 회차 후보를 무효화하는 데 사용한다. 검수 알림은 26일차 범위다.
+
+## 검수 기한 자동 완료 (25일차)
+
+- `completeExpiredReviews` 예약 함수는 `status=REVIEW_PENDING`과 `reviewDeadlineAt<=현재 시각`인 업무를 인덱스로 조회한다. 로컬 `dev:all`도 같은 함수를 주기적으로 실행한다.
+- 각 업무를 트랜잭션에서 다시 읽어 상태·검수 필요 여부·회차·제출 시각·기한을 확인한다. 유효하면 `DONE`, `completionReason=REVIEW_TIMEOUT`, `reviewDeadlineAt=null`로 바꾸고 `actorId=system`, `action=autoCompleteReview` 이력을 같은 트랜잭션에 추가한다.
+- 요청자의 승인·반려는 현재 검수 기한을 넘기면 거부한다. 이미 완료하거나 재제출한 업무를 이전 회차의 예약 실행이 다시 처리하지 않는다.
 
 ## 권한
 - 워크스페이스 장만 초대를 발송·철회·조회한다. 초대 수락은 서버 트랜잭션에서 로그인 이메일과 초대 이메일의 일치·토큰 해시·만료·사용 여부·멤버십 중복을 검증하고 멤버십·목록 미러·초대 상태를 한 번에 기록한다. 초대 기한은 7일이다.
