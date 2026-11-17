@@ -12,6 +12,7 @@ export interface CalendarTaskInput {
   reviewCycle: number;
   createdAt: Date;
   dueDate: Date;
+  proposedDueDate?: Date | null;
   reviewSubmittedAt?: Date | null;
   reviewDeadlineAt?: Date | null;
 }
@@ -29,6 +30,24 @@ export function koreanDateKey(date: Date): string {
   }).formatToParts(date);
   const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
   return `${value('year')}-${value('month')}-${value('day')}`;
+}
+
+export function canProposeCalendarDue(task: Pick<CalendarTaskInput, 'assigneeId' | 'status'> & { proposedDueDate?: unknown }, viewerId: string): boolean {
+  return task.assigneeId === viewerId && task.proposedDueDate == null
+    && (task.status === 'REQUESTED' || task.status === 'ACCEPTED' || task.status === 'IN_PROGRESS');
+}
+
+export function shiftedCalendarDueDate(originalDue: Date, previousExclusiveEnd: string, nextExclusiveEnd: string): Date | null {
+  const parseDay = (value: string): number | null => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const millis = Date.parse(`${value}T00:00:00.000Z`);
+    return Number.isFinite(millis) && new Date(millis).toISOString().slice(0, 10) === value ? millis : null;
+  };
+  const previous = parseDay(previousExclusiveEnd);
+  const next = parseDay(nextExclusiveEnd);
+  if (!Number.isFinite(originalDue.getTime()) || previous === null || next === null || previous === next
+    || previousExclusiveEnd !== nextKoreanDateKey(koreanDateKey(originalDue))) return null;
+  return new Date(originalDue.getTime() + next - previous);
 }
 
 function nextKoreanDateKey(key: string): string {
@@ -52,17 +71,17 @@ export function buildCalendarEvents(tasks: CalendarTaskInput[], meetings: Calend
       ? dateRange(task.reviewSubmittedAt, task.reviewDeadlineAt) : null;
     const taskRange = dateRange(task.createdAt, task.dueDate);
     if (taskRange && (filter !== 'review' || !reviewRange)) {
-      events.push({ id: `task:${task.id}`, title: task.title, allDay: true, ...taskRange,
+      events.push({ id: `task:${task.id}`, title: task.title, allDay: true, editable: canProposeCalendarDue(task, viewerId), ...taskRange,
         extendedProps: { kind: 'task', taskId: task.id, status: task.status, startsAt: task.createdAt.toISOString(), endsAt: task.dueDate.toISOString() } });
     }
     if (reviewRange && filter !== 'mine') {
-      events.push({ id: `review:${task.id}:${task.reviewCycle}`, title: `검수 · ${task.title}`, allDay: true, ...reviewRange,
+      events.push({ id: `review:${task.id}:${task.reviewCycle}`, title: `검수 · ${task.title}`, allDay: true, editable: false, ...reviewRange,
         extendedProps: { kind: 'review', taskId: task.id, status: task.status, startsAt: task.reviewSubmittedAt!.toISOString(), endsAt: task.reviewDeadlineAt!.toISOString() } });
     }
   }
   if (filter === 'team') for (const meeting of meetings) {
     if (!Number.isFinite(meeting.startsAt.getTime()) || !Number.isFinite(meeting.endsAt.getTime()) || meeting.endsAt <= meeting.startsAt) continue;
-    events.push({ id: `meeting:${meeting.id}`, title: `회의 · ${meeting.title}`, allDay: false,
+    events.push({ id: `meeting:${meeting.id}`, title: `회의 · ${meeting.title}`, allDay: false, editable: false,
       start: meeting.startsAt.toISOString(), end: meeting.endsAt.toISOString(),
       extendedProps: { kind: 'meeting', meetingId: meeting.id, startsAt: meeting.startsAt.toISOString(), endsAt: meeting.endsAt.toISOString() } });
   }

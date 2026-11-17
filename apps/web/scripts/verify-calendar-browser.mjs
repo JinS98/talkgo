@@ -105,9 +105,48 @@ try {
   await memberPage.getByRole('button', { name: '내가 검수할 업무' }).click();
   await memberPage.getByText('선택한 범위에 표시할 일정이 없습니다.').waitFor();
   assert.equal(await memberPage.getByTitle(/^검수 · 검수 대상 업무 ·/).count(), 0);
+
+  const dragStart = Timestamp.fromMillis(now.toMillis() + 7 * 86_400_000);
+  const originalDue = Timestamp.fromMillis(now.toMillis() + 8 * 86_400_000);
+  const dragTaskRef = db.doc('tasks/calendar-drag-task');
+  await dragTaskRef.set({ workspaceId, title: '드래그 협의 업무', status: 'ACCEPTED', requesterId: owner.uid,
+    assigneeId: member.uid, reviewRequired: false, reviewCycle: 0, proposedDueDate: null,
+    createdAt: dragStart, dueDate: originalDue });
+  await memberPage.getByRole('button', { name: '내 담당 업무' }).click();
+  const draggable = memberPage.getByTitle(/^드래그 협의 업무 ·/).first();
+  await draggable.waitFor();
+  const targetDate = new Date(now.toMillis() + 10 * 86_400_000);
+  const targetParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(targetDate);
+  const targetValue = type => targetParts.find(item => item.type === type).value;
+  const targetKey = `${targetValue('year')}-${targetValue('month')}-${targetValue('day')}`;
+  await draggable.dragTo(memberPage.locator(`[data-date="${targetKey}"][role="cell"]`));
+  const dueDialog = memberPage.getByRole('dialog', { name: '마감 변경 제안' });
+  await dueDialog.waitFor();
+  if (process.env.TASKGO_CAPTURE_UI) await memberPage.screenshot({ path: resolve(root, '.tmp-ui-calendar-proposal.png') });
+  assert.equal((await dragTaskRef.get()).get('dueDate').toMillis(), originalDue.toMillis(), 'Dragging must not directly change the stored due date.');
+  const proposedLocal = await dueDialog.getByLabel('제안 마감 날짜·시간').inputValue();
+  assert.notEqual(proposedLocal, local(originalDue.toDate()));
+  await dueDialog.getByRole('button', { name: '제안 보내기' }).click();
+  await dueDialog.waitFor({ state: 'hidden' });
+  const pendingTask = await dragTaskRef.get();
+  assert.equal(pendingTask.get('dueDate').toMillis(), originalDue.toMillis());
+  assert.ok(pendingTask.get('proposedDueDate'));
+  await page.getByRole('region', { name: '받은 마감 변경 제안' }).getByText('드래그 협의 업무').waitFor();
+  await page.getByRole('region', { name: '받은 마감 변경 제안' }).getByRole('button', { name: '변경 승인' }).click();
+  await page.getByRole('region', { name: '받은 마감 변경 제안' }).getByText('드래그 협의 업무').waitFor({ state: 'hidden' });
+  const approvedTask = await dragTaskRef.get();
+  assert.equal(approvedTask.get('dueDate').toMillis(), pendingTask.get('proposedDueDate').toMillis());
+  assert.equal(approvedTask.get('proposedDueDate'), null);
+  await dragTaskRef.update({ proposedDueDate: Timestamp.fromMillis(approvedTask.get('dueDate').toMillis() + 86_400_000) });
+  await page.getByRole('region', { name: '받은 마감 변경 제안' }).getByText('드래그 협의 업무').waitFor();
+  await page.getByRole('region', { name: '받은 마감 변경 제안' }).getByRole('button', { name: '변경 거절' }).click();
+  await page.getByRole('region', { name: '받은 마감 변경 제안' }).getByText('드래그 협의 업무').waitFor({ state: 'hidden' });
+  const rejectedTask = await dragTaskRef.get();
+  assert.equal(rejectedTask.get('dueDate').toMillis(), approvedTask.get('dueDate').toMillis());
+  assert.equal(rejectedTask.get('proposedDueDate'), null);
   if (process.env.TASKGO_CAPTURE_UI) await page.screenshot({ path: resolve(root, '.tmp-ui-calendar.png') });
   assert.deepEqual(errors, []);
-  console.log('PASS: FullCalendar team, assignee, and reviewer filters; overflow, meetings, and empty states.');
+  console.log('PASS: calendar filters, overflow, meeting visibility, drag proposal, approval, and rejection without premature due-date change.');
 } finally {
   await browser?.close();
   await vite?.close();

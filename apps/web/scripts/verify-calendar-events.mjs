@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildCalendarEvents, koreanDateKey } from '../src/features/tasks/calendarEvents.ts';
+import { buildCalendarEvents, canProposeCalendarDue, koreanDateKey, shiftedCalendarDueDate } from '../src/features/tasks/calendarEvents.ts';
 
 const date = value => new Date(value);
 const task = { id: 'task-1', title: '업무', status: 'REQUESTED', assigneeId: 'member', requesterId: 'owner', reviewRequired: false, reviewCycle: 0,
@@ -23,4 +23,17 @@ assert.deepEqual(buildCalendarEvents([reviewTask], [meeting], 'review', 'owner')
 assert.equal(buildCalendarEvents([reviewTask], [meeting], 'review', 'member').length, 0, 'Assignee does not see another person’s review filter.');
 assert.deepEqual(buildCalendarEvents([{ ...reviewTask, status: 'ACCEPTED', reviewSubmittedAt: null, reviewDeadlineAt: null }], [], 'review', 'owner').map(event => event.id), ['task:task-1'], 'Before submission, requester sees the task period.');
 assert.equal(buildCalendarEvents([{ ...reviewTask, status: 'DECLINED' }], [], 'review', 'owner').length, 0);
-console.log('PASS: Seoul dates, inclusive deadlines, team/assignee/reviewer scopes, review ranges, and meetings.');
+assert.equal(canProposeCalendarDue(task, 'member'), true);
+assert.equal(canProposeCalendarDue(task, 'owner'), false);
+assert.equal(canProposeCalendarDue({ ...task, proposedDueDate: date('2026-11-03T12:00:00.000Z') }, 'member'), false);
+assert.equal(canProposeCalendarDue({ ...task, status: 'REVIEW_PENDING' }, 'member'), false);
+assert.equal(team[0].editable, false, 'The requester cannot move an assigned task.');
+assert.equal(buildCalendarEvents([task], [], 'mine', 'member')[0].editable, true);
+assert.equal(buildCalendarEvents([reviewTask], [], 'review', 'owner')[0].editable, false);
+assert.equal(team[1].editable, false, 'Meetings do not enter the task proposal flow.');
+assert.equal(shiftedCalendarDueDate(task.dueDate, '2026-11-03', '2026-11-05').toISOString(), '2026-11-04T12:00:00.000Z');
+assert.equal(shiftedCalendarDueDate(task.dueDate, '2026-11-03', '2026-11-02').toISOString(), '2026-11-01T12:00:00.000Z');
+assert.equal(shiftedCalendarDueDate(task.dueDate, '2026-11-03', '2026-11-03'), null);
+assert.equal(shiftedCalendarDueDate(task.dueDate, '2026-11-04', '2026-11-05'), null, 'Stale calendar end must not change a task.');
+assert.equal(shiftedCalendarDueDate(task.dueDate, 'invalid', '2026-11-05'), null);
+console.log('PASS: Seoul dates, calendar scopes, editable permissions, and reversible due-date shifts.');

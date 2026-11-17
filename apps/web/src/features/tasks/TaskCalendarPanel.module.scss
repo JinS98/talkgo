@@ -25,12 +25,28 @@
 .event.pending { border-style:dashed; background:#fff; color:#7366bf !important; }
 .event.review { border-color:#b9d7cc; background:#e9f6f0; color:#2d7458 !important; }
 .event.meeting { border-color:#c7d8f0; background:#edf4ff; color:#34679c !important; }
+.event.movable { cursor:grab; }
+.event.movable:active { cursor:grabbing; }
 .legend { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; color:#8893a3; font-size:10px; }
 .legend span::before { content:''; display:inline-block; width:10px; height:10px; margin-right:6px; border:1px solid #dcd6fb; border-radius:2px; background:#eeeaff; vertical-align:-1px; }
 .legend .pendingKey::before { border-style:dashed; background:#fff; }
 .legend .reviewKey::before { border-color:#b9d7cc; background:#e9f6f0; }
 .legend .meetingKey::before { border-color:#c7d8f0; background:#edf4ff; }
 .filterDescription { margin:-5px 0 13px; color:#778294; font-size:11px; line-height:1.5; }
+.dragHint { margin:0 0 12px; color:#778294; font-size:11px; line-height:1.5; }
+.actionNotice { margin:0 0 12px; padding:10px 12px; border:1px solid #cfe7dc; border-radius:7px; background:#f0faf4; color:#287253; font-size:11px; }
+.pendingRequests { margin:0 0 14px; padding:14px; border:1px solid #dfd9f7; border-radius:9px; background:#fbfaff; }
+.pendingRequests h2 { margin:0 0 10px; font-size:13px; }
+.pendingRequest { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:9px 0; border-top:1px solid #e9e5f6; font-size:11px; }
+.pendingRequest strong { min-width:120px; overflow-wrap:anywhere; }
+.pendingRequest span { color:#647085; }
+.pendingRequest div { display:flex; gap:6px; margin-left:auto; }
+.pendingRequest button { padding:6px 9px; border:1px solid #d7d2ed; border-radius:5px; background:#fff; color:#5142a4; cursor:pointer; font:inherit; font-weight:700; }
+.pendingRequest button:first-child { border-color:var(--accent); background:var(--accent); color:#fff; }
+.pendingRequest button:disabled { opacity:.55; cursor:wait; }
+.pendingRequest .error { flex-basis:100%; margin:0; }
+.draftTaskTitle { margin:0; font-size:13px; font-weight:750; }
+.currentDue,.proposalHint { margin:0; color:#647085; font-size:11px; line-height:1.5; }
 .empty { margin:0 0 12px; padding:10px 12px; border:1px solid #e2e6ed; border-radius:7px; background:#fafbfc; color:#778294; font-size:11px; }
 .error,.loading { margin:0 0 12px; padding:10px 12px; border-radius:7px; font-size:12px; }
 .error { border:1px solid #f1d5db; background:#fff2f4; color:#9c3e50; }

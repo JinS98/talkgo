@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/react/daygrid';
+import interactionPlugin from '@fullcalendar/react/interaction';
 import classicThemePlugin from '@fullcalendar/react/themes/classic';
 import koLocale from '@fullcalendar/react/locales/ko';
-import type { CalendarRef, EventDisplayInfo, MountInfo } from '@fullcalendar/react';
+import type { CalendarRef, EventDisplayInfo, EventDropInfo, EventResizeDoneInfo, MountInfo } from '@fullcalendar/react';
 import '@fullcalendar/react/skeleton.css';
 import '@fullcalendar/react/themes/classic/theme.css';
 import '@fullcalendar/react/themes/classic/palette.css';
@@ -11,11 +12,14 @@ import { getIdToken, type Auth } from 'firebase/auth';
 import { collection, onSnapshot, query, Timestamp, where, type Firestore } from 'firebase/firestore';
 import { httpsCallable, type Functions } from 'firebase/functions';
 import type { TaskRecord } from '@taskgo/contracts/task';
-import { buildCalendarEvents, koreanDateKey, type CalendarFilter } from './calendarEvents';
+import { buildCalendarEvents, canProposeCalendarDue, koreanDateKey, shiftedCalendarDueDate, type CalendarFilter } from './calendarEvents';
+import { respondTask, taskResponseError } from './taskResponseApi';
 import styles from './TaskCalendarPanel.module.scss';
 
 type CalendarTask = TaskRecord<Timestamp> & { id: string };
 type MeetingRecord = { id: string; title: string; startsAt: Timestamp; endsAt: Timestamp };
+type DueProposalDraft = { taskId: string; dueLocal: string };
+const calendarPlugins = [dayGridPlugin, interactionPlugin, classicThemePlugin];
 const filters: { id: CalendarFilter; label: string }[] = [
   { id: 'team', label: '팀 전체 일정' }, { id: 'mine', label: '내 담당 업무' }, { id: 'review', label: '내가 검수할 업무' },
 ];
@@ -37,6 +41,7 @@ function eventTitle(info: MountInfo<EventDisplayInfo>) {
 export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }: { auth: Auth; db: Firestore; functions: Functions; workspaceId: string; viewerId: string }) {
   const calendarRef = useRef<CalendarRef>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const proposalDialogRef = useRef<HTMLDialogElement>(null);
   const [month, setMonth] = useState(() => koreanDateKey(new Date()).slice(0, 7));
   const [filter, setFilter] = useState<CalendarFilter>('team');
   const [tasks, setTasks] = useState<CalendarTask[]>([]);
@@ -51,6 +56,12 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
   const [meetingEnd, setMeetingEnd] = useState(() => inputValue(new Date(Date.now() + 2 * 60 * 60_000)));
   const [meetingError, setMeetingError] = useState('');
   const [meetingPending, setMeetingPending] = useState(false);
+  const [dueProposal, setDueProposal] = useState<DueProposalDraft | null>(null);
+  const [dueProposalError, setDueProposalError] = useState('');
+  const [dueProposalPending, setDueProposalPending] = useState(false);
+  const [respondingTaskIds, setRespondingTaskIds] = useState<Set<string>>(() => new Set());
+  const [responseError, setResponseError] = useState<{ taskId: string; message: string } | null>(null);
+  const [actionNotice, setActionNotice] = useState('');
 
   useEffect(() => onSnapshot(query(collection(db, 'tasks'), where('workspaceId', '==', workspaceId)), snapshot => {
     setTasks(snapshot.docs.map(item => ({ ...item.data() as TaskRecord<Timestamp>, id: item.id })));
@@ -68,10 +79,17 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
     if (!meetingOpen && dialog?.open) dialog.close();
     return () => { if (dialog?.open) dialog.close(); };
   }, [meetingOpen]);
+  useEffect(() => {
+    const dialog = proposalDialogRef.current;
+    if (dueProposal && dialog && !dialog.open) dialog.showModal();
+    if (!dueProposal && dialog?.open) dialog.close();
+    return () => { if (dialog?.open) dialog.close(); };
+  }, [dueProposal]);
 
   const events = useMemo(() => buildCalendarEvents(tasks.filter(task => task.createdAt instanceof Timestamp && task.dueDate instanceof Timestamp).map(task => ({
     id: task.id, title: task.title, status: task.status, assigneeId: task.assigneeId, requesterId: task.requesterId,
     reviewRequired: task.reviewRequired, reviewCycle: task.reviewCycle, createdAt: task.createdAt.toDate(), dueDate: task.dueDate.toDate(),
+    proposedDueDate: task.proposedDueDate instanceof Timestamp ? task.proposedDueDate.toDate() : null,
     reviewSubmittedAt: task.reviewSubmittedAt instanceof Timestamp ? task.reviewSubmittedAt.toDate() : null,
     reviewDeadlineAt: task.reviewDeadlineAt instanceof Timestamp ? task.reviewDeadlineAt.toDate() : null,
   })), meetings.filter(meeting => meeting.startsAt instanceof Timestamp && meeting.endsAt instanceof Timestamp).map(meeting => ({
@@ -79,6 +97,57 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
   })), filter, viewerId), [tasks, meetings, filter, viewerId]);
   const loading = !tasksLoaded || filter === 'team' && !meetingsLoaded;
   const loadError = taskLoadError || filter === 'team' && meetingLoadError;
+  const draftTask = dueProposal ? tasks.find(task => task.id === dueProposal.taskId) : undefined;
+  const pendingRequests = tasks.filter(task => task.requesterId === viewerId && task.proposedDueDate instanceof Timestamp
+    && (task.status === 'REQUESTED' || task.status === 'ACCEPTED' || task.status === 'IN_PROGRESS'));
+
+  function startDueProposal(info: Pick<EventDropInfo, 'event' | 'oldEvent' | 'revert'> | Pick<EventResizeDoneInfo, 'event' | 'oldEvent' | 'revert'>) {
+    const nextEnd = info.event.endStr;
+    const previousEnd = info.oldEvent.endStr;
+    const taskId = info.event.extendedProps.taskId as string | undefined;
+    info.revert();
+    const task = tasks.find(item => item.id === taskId);
+    if (!task || !(task.dueDate instanceof Timestamp) || !canProposeCalendarDue(task, viewerId)) return;
+    const candidate = shiftedCalendarDueDate(task.dueDate.toDate(), previousEnd, nextEnd);
+    if (!candidate) return;
+    setActionNotice('');
+    setDueProposalError('');
+    setDueProposal({ taskId: task.id, dueLocal: inputValue(candidate) });
+  }
+
+  async function submitDueProposal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!dueProposal || !draftTask || dueProposalPending) return;
+    const candidate = new Date(dueProposal.dueLocal);
+    if (!Number.isFinite(candidate.getTime()) || candidate <= new Date() || candidate.getTime() === draftTask.dueDate.toMillis()) {
+      setDueProposalError('현재 마감과 다른 미래의 날짜·시간을 선택해 주세요.'); return;
+    }
+    if (!canProposeCalendarDue(draftTask, viewerId)) {
+      setDueProposalError('업무 상태가 변경됐습니다. 현재 일정을 확인해 주세요.'); return;
+    }
+    setDueProposalPending(true);
+    setDueProposalError('');
+    try {
+      await respondTask(auth, functions, { taskId: draftTask.id, action: 'proposeDueDate', proposedDueDate: candidate.toISOString() });
+      setDueProposal(null);
+      setActionNotice('마감 변경을 제안했습니다. 요청자가 승인할 때까지 기존 마감일이 유지됩니다.');
+    } catch (cause) {
+      setDueProposalError(taskResponseError(cause));
+    } finally { setDueProposalPending(false); }
+  }
+
+  async function respondToDueProposal(taskId: string, action: 'approveDueDate' | 'rejectDueDate') {
+    if (respondingTaskIds.has(taskId)) return;
+    setRespondingTaskIds(current => new Set(current).add(taskId));
+    setResponseError(null);
+    setActionNotice('');
+    try {
+      await respondTask(auth, functions, { taskId, action });
+      setActionNotice(action === 'approveDueDate' ? '마감 변경을 승인했습니다.' : '마감 변경 제안을 거절했습니다.');
+    } catch (cause) {
+      setResponseError({ taskId, message: taskResponseError(cause) });
+    } finally { setRespondingTaskIds(current => { const next = new Set(current); next.delete(taskId); return next; }); }
+  }
 
   async function submitMeeting(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -115,17 +184,34 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
       <div className={styles.controlRight}><div className={styles.filters} role="group" aria-label="일정 필터">{filters.map(item => <button key={item.id} type="button" aria-pressed={filter === item.id} className={filter === item.id ? styles.selected : ''} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div><button className={styles.addMeeting} type="button" onClick={openMeeting}>회의 추가</button></div>
     </div>
     <p className={styles.filterDescription}>{filterDescriptions[filter]}</p>
+    <p className={styles.dragHint}>담당자는 업무 바를 옮기거나 끝을 드래그해 새 마감을 제안할 수 있습니다. 요청자가 승인하면 확정됩니다.</p>
+    {actionNotice && <p role="status" className={styles.actionNotice}>{actionNotice}</p>}
+    {pendingRequests.length > 0 && <section className={styles.pendingRequests} aria-label="받은 마감 변경 제안">
+      <h2>받은 마감 변경 제안</h2>
+      {pendingRequests.map(task => <article key={task.id} className={styles.pendingRequest}>
+        <strong>{task.title}</strong>
+        <span>현재 마감 {dateTime.format(task.dueDate.toDate())} → 제안 {task.proposedDueDate instanceof Timestamp ? dateTime.format(task.proposedDueDate.toDate()) : ''}</span>
+        <div><button type="button" disabled={respondingTaskIds.has(task.id)} onClick={() => void respondToDueProposal(task.id, 'approveDueDate')}>변경 승인</button><button type="button" disabled={respondingTaskIds.has(task.id)} onClick={() => void respondToDueProposal(task.id, 'rejectDueDate')}>변경 거절</button></div>
+        {responseError?.taskId === task.id && <p role="alert" className={styles.error}>{responseError.message}</p>}
+      </article>)}
+    </section>}
     {loadError && <p role="alert" className={styles.error}>{loadError}</p>}
     {loading && <p role="status" className={styles.loading}>일정을 불러오는 중…</p>}
     {!loading && !loadError && events.length === 0 && <p role="status" className={styles.empty}>선택한 범위에 표시할 일정이 없습니다.</p>}
     <div className={styles.calendarOuter}>
-      <FullCalendar ref={calendarRef} plugins={[dayGridPlugin, classicThemePlugin]} initialView="dayGridMonth" locale={koLocale} timeZone="Asia/Seoul" headerToolbar={false} fixedWeekCount={false} dayMaxEvents={3} moreLinkClick="popover" events={events} datesSet={info => setMonth(koreanDateKey(info.view.calendar.getDate()).slice(0, 7))} eventDidMount={eventTitle} eventClass={info => `${styles.event} ${styles[info.event.extendedProps.kind as 'task' | 'review' | 'meeting']} ${info.event.extendedProps.status === 'REQUESTED' ? styles.pending : ''}`} dayCellClass={styles.dayCell} dayHeaderClass={styles.dayHeader} moreLinkClass={styles.moreLink} popoverClass={styles.popover} dayHeaderFormat={{ weekday: 'short' }} />
+      <FullCalendar ref={calendarRef} plugins={calendarPlugins} initialView="dayGridMonth" locale={koLocale} timeZone="Asia/Seoul" headerToolbar={false} fixedWeekCount={false} dayMaxEvents={3} moreLinkClick="popover" editable events={events} eventDrop={startDueProposal} eventResize={startDueProposal} datesSet={info => setMonth(koreanDateKey(info.view.calendar.getDate()).slice(0, 7))} eventDidMount={eventTitle} eventClass={info => `${styles.event} ${styles[info.event.extendedProps.kind as 'task' | 'review' | 'meeting']} ${info.event.extendedProps.status === 'REQUESTED' ? styles.pending : ''} ${info.isDraggable || info.isEndResizable ? styles.movable : ''}`} dayCellClass={styles.dayCell} dayHeaderClass={styles.dayHeader} moreLinkClass={styles.moreLink} popoverClass={styles.popover} dayHeaderFormat={{ weekday: 'short' }} />
     </div>
     <div className={styles.legend}><span>확정된 업무</span><span className={styles.pendingKey}>요청 대기 업무</span>{filter !== 'mine' && <span className={styles.reviewKey}>검수 기한</span>}{filter === 'team' && <span className={styles.meetingKey}>회의</span>}</div>
     <dialog ref={dialogRef} className={styles.meetingDialog} aria-labelledby="meeting-title" onCancel={() => setMeetingOpen(false)} onClick={event => { if (event.target === event.currentTarget) setMeetingOpen(false); }}>
       <form onSubmit={submitMeeting}><div className={styles.dialogHeading}><h2 id="meeting-title">회의 추가</h2><button type="button" aria-label="회의 추가 닫기" onClick={() => setMeetingOpen(false)}>×</button></div>
         <div className={styles.dialogBody}><label>회의 제목<input required maxLength={120} minLength={2} value={meetingTitle} onChange={event => setMeetingTitle(event.target.value)} placeholder="회의 제목" /></label><label>시작 날짜·시간<input required type="datetime-local" value={meetingStart} onChange={event => setMeetingStart(event.target.value)} /></label><label>종료 날짜·시간<input required type="datetime-local" value={meetingEnd} onChange={event => setMeetingEnd(event.target.value)} /></label>{meetingError && <p role="alert" className={styles.error}>{meetingError}</p>}</div>
         <div className={styles.dialogActions}><button type="button" onClick={() => setMeetingOpen(false)}>취소</button><button type="submit" disabled={meetingPending}>{meetingPending ? '등록 중…' : '회의 등록'}</button></div>
+      </form>
+    </dialog>
+    <dialog ref={proposalDialogRef} className={styles.meetingDialog} aria-labelledby="due-proposal-title" onCancel={event => { if (dueProposalPending) event.preventDefault(); else setDueProposal(null); }} onClick={event => { if (event.target === event.currentTarget && !dueProposalPending) setDueProposal(null); }}>
+      <form onSubmit={submitDueProposal}><div className={styles.dialogHeading}><h2 id="due-proposal-title">마감 변경 제안</h2><button type="button" aria-label="마감 변경 제안 닫기" disabled={dueProposalPending} onClick={() => setDueProposal(null)}>×</button></div>
+        <div className={styles.dialogBody}>{draftTask ? <><p className={styles.draftTaskTitle}>{draftTask.title}</p><p className={styles.currentDue}>현재 마감 {dateTime.format(draftTask.dueDate.toDate())}</p><label>제안 마감 날짜·시간<input required type="datetime-local" min={inputValue(new Date())} value={dueProposal?.dueLocal ?? ''} onChange={event => setDueProposal(current => current && { ...current, dueLocal: event.target.value })} /></label><p className={styles.proposalHint}>요청자가 승인하기 전까지 현재 마감일이 유지됩니다.</p></> : <p>업무를 찾지 못했습니다. 일정을 다시 확인해 주세요.</p>}{dueProposalError && <p role="alert" className={styles.error}>{dueProposalError}</p>}</div>
+        <div className={styles.dialogActions}><button type="button" disabled={dueProposalPending} onClick={() => setDueProposal(null)}>취소</button><button type="submit" disabled={dueProposalPending || !draftTask || !canProposeCalendarDue(draftTask, viewerId)}>{dueProposalPending ? '전송 중…' : '제안 보내기'}</button></div>
       </form>
     </dialog>
   </section>;
