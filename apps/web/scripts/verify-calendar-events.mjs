@@ -18,4 +18,9 @@ const reviewTask = { ...task, reviewRequired: true, status: 'REVIEW_PENDING', re
 const reviewEvents = buildCalendarEvents([reviewTask], [meeting], 'review', 'owner');
 assert.deepEqual([reviewEvents[0].id, reviewEvents[0].start, reviewEvents[0].end], ['review:task-1:2', '2026-11-03', '2026-11-05']);
 assert.equal(buildCalendarEvents([reviewTask], [], 'team', 'owner').length, 2, 'Team calendar includes task and review deadline.');
-console.log('PASS: Seoul date boundaries, inclusive deadlines, filters, review ranges, and timed meetings.');
+assert.deepEqual(buildCalendarEvents([reviewTask], [meeting], 'mine', 'member').map(event => event.id), ['task:task-1'], 'Assignee sees the task period without a duplicate review bar.');
+assert.deepEqual(buildCalendarEvents([reviewTask], [meeting], 'review', 'owner').map(event => event.id), ['review:task-1:2'], 'Requester sees the submitted review period.');
+assert.equal(buildCalendarEvents([reviewTask], [meeting], 'review', 'member').length, 0, 'Assignee does not see another person’s review filter.');
+assert.deepEqual(buildCalendarEvents([{ ...reviewTask, status: 'ACCEPTED', reviewSubmittedAt: null, reviewDeadlineAt: null }], [], 'review', 'owner').map(event => event.id), ['task:task-1'], 'Before submission, requester sees the task period.');
+assert.equal(buildCalendarEvents([{ ...reviewTask, status: 'DECLINED' }], [], 'review', 'owner').length, 0);
+console.log('PASS: Seoul dates, inclusive deadlines, team/assignee/reviewer scopes, review ranges, and meetings.');

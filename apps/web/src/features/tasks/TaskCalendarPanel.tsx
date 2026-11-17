@@ -19,6 +19,11 @@ type MeetingRecord = { id: string; title: string; startsAt: Timestamp; endsAt: T
 const filters: { id: CalendarFilter; label: string }[] = [
   { id: 'team', label: '팀 전체 일정' }, { id: 'mine', label: '내 담당 업무' }, { id: 'review', label: '내가 검수할 업무' },
 ];
+const filterDescriptions: Record<CalendarFilter, string> = {
+  team: '팀의 업무, 검수 기한, 회의를 함께 표시합니다.',
+  mine: '내가 담당자로 지정된 업무의 요청일부터 마감일까지 표시합니다.',
+  review: '내가 요청한 검수 대상 업무를 표시합니다. 검수 대기 중에는 제출일부터 검수 기한까지 표시합니다.',
+};
 const dateTime = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short' });
 function inputValue(date: Date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -38,7 +43,8 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
   const [tasksLoaded, setTasksLoaded] = useState(false);
   const [meetingsLoaded, setMeetingsLoaded] = useState(false);
-  const [error, setError] = useState('');
+  const [taskLoadError, setTaskLoadError] = useState('');
+  const [meetingLoadError, setMeetingLoadError] = useState('');
   const [meetingOpen, setMeetingOpen] = useState(false);
   const [meetingTitle, setMeetingTitle] = useState('');
   const [meetingStart, setMeetingStart] = useState(() => inputValue(new Date(Date.now() + 60 * 60_000)));
@@ -49,11 +55,13 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
   useEffect(() => onSnapshot(query(collection(db, 'tasks'), where('workspaceId', '==', workspaceId)), snapshot => {
     setTasks(snapshot.docs.map(item => ({ ...item.data() as TaskRecord<Timestamp>, id: item.id })));
     setTasksLoaded(true);
-  }, () => { setTasksLoaded(true); setError('업무 일정을 불러오지 못했습니다. 연결 상태를 확인해 주세요.'); }), [db, workspaceId]);
+    setTaskLoadError('');
+  }, () => { setTasksLoaded(true); setTaskLoadError('업무 일정을 불러오지 못했습니다. 연결 상태를 확인해 주세요.'); }), [db, workspaceId]);
   useEffect(() => onSnapshot(query(collection(db, 'meetings'), where('workspaceId', '==', workspaceId)), snapshot => {
     setMeetings(snapshot.docs.map(item => ({ ...item.data() as Omit<MeetingRecord, 'id'>, id: item.id })));
     setMeetingsLoaded(true);
-  }, () => { setMeetingsLoaded(true); setError('회의 일정을 불러오지 못했습니다. 연결 상태를 확인해 주세요.'); }), [db, workspaceId]);
+    setMeetingLoadError('');
+  }, () => { setMeetingsLoaded(true); setMeetingLoadError('회의 일정을 불러오지 못했습니다. 연결 상태를 확인해 주세요.'); }), [db, workspaceId]);
   useEffect(() => {
     const dialog = dialogRef.current;
     if (meetingOpen && dialog && !dialog.open) dialog.showModal();
@@ -69,6 +77,8 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
   })), meetings.filter(meeting => meeting.startsAt instanceof Timestamp && meeting.endsAt instanceof Timestamp).map(meeting => ({
     id: meeting.id, title: meeting.title, startsAt: meeting.startsAt.toDate(), endsAt: meeting.endsAt.toDate(),
   })), filter, viewerId), [tasks, meetings, filter, viewerId]);
+  const loading = !tasksLoaded || filter === 'team' && !meetingsLoaded;
+  const loadError = taskLoadError || filter === 'team' && meetingLoadError;
 
   async function submitMeeting(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,15 +112,16 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
     <div className={styles.heading}><p className={styles.eyebrow}>SCHEDULE</p><h1 id="calendar-title">캘린더</h1><p>업무 요청일부터 마감일까지, 검수 기한과 회의까지 한눈에 확인하세요.</p></div>
     <div className={styles.controls}>
       <div className={styles.monthControl}><button type="button" aria-label="이전 달" onClick={() => calendarRef.current?.getApi().prev()}>‹</button><strong aria-live="polite">{Number(month.slice(0, 4))}년 {Number(month.slice(5))}월</strong><button type="button" aria-label="다음 달" onClick={() => calendarRef.current?.getApi().next()}>›</button></div>
-      <div className={styles.controlRight}><div className={styles.filters} aria-label="일정 필터">{filters.map(item => <button key={item.id} type="button" aria-pressed={filter === item.id} className={filter === item.id ? styles.selected : ''} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div><button className={styles.addMeeting} type="button" onClick={openMeeting}>회의 추가</button></div>
+      <div className={styles.controlRight}><div className={styles.filters} role="group" aria-label="일정 필터">{filters.map(item => <button key={item.id} type="button" aria-pressed={filter === item.id} className={filter === item.id ? styles.selected : ''} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div><button className={styles.addMeeting} type="button" onClick={openMeeting}>회의 추가</button></div>
     </div>
-    {error && <p role="alert" className={styles.error}>{error}</p>}
-    {(!tasksLoaded || !meetingsLoaded) && <p role="status" className={styles.loading}>일정을 불러오는 중…</p>}
+    <p className={styles.filterDescription}>{filterDescriptions[filter]}</p>
+    {loadError && <p role="alert" className={styles.error}>{loadError}</p>}
+    {loading && <p role="status" className={styles.loading}>일정을 불러오는 중…</p>}
+    {!loading && !loadError && events.length === 0 && <p role="status" className={styles.empty}>선택한 범위에 표시할 일정이 없습니다.</p>}
     <div className={styles.calendarOuter}>
       <FullCalendar ref={calendarRef} plugins={[dayGridPlugin, classicThemePlugin]} initialView="dayGridMonth" locale={koLocale} timeZone="Asia/Seoul" headerToolbar={false} fixedWeekCount={false} dayMaxEvents={3} moreLinkClick="popover" events={events} datesSet={info => setMonth(koreanDateKey(info.view.calendar.getDate()).slice(0, 7))} eventDidMount={eventTitle} eventClass={info => `${styles.event} ${styles[info.event.extendedProps.kind as 'task' | 'review' | 'meeting']} ${info.event.extendedProps.status === 'REQUESTED' ? styles.pending : ''}`} dayCellClass={styles.dayCell} dayHeaderClass={styles.dayHeader} moreLinkClass={styles.moreLink} popoverClass={styles.popover} dayHeaderFormat={{ weekday: 'short' }} />
     </div>
-    <div className={styles.legend}><span>확정된 업무</span><span className={styles.pendingKey}>요청 대기 업무</span><span className={styles.reviewKey}>검수 기한</span><span className={styles.meetingKey}>회의</span></div>
-    {filter === 'review' && <p className={styles.note}>검수 대기 중인 업무는 제출일부터 검수 기한까지 표시합니다.</p>}
+    <div className={styles.legend}><span>확정된 업무</span><span className={styles.pendingKey}>요청 대기 업무</span>{filter !== 'mine' && <span className={styles.reviewKey}>검수 기한</span>}{filter === 'team' && <span className={styles.meetingKey}>회의</span>}</div>
     <dialog ref={dialogRef} className={styles.meetingDialog} aria-labelledby="meeting-title" onCancel={() => setMeetingOpen(false)} onClick={event => { if (event.target === event.currentTarget) setMeetingOpen(false); }}>
       <form onSubmit={submitMeeting}><div className={styles.dialogHeading}><h2 id="meeting-title">회의 추가</h2><button type="button" aria-label="회의 추가 닫기" onClick={() => setMeetingOpen(false)}>×</button></div>
         <div className={styles.dialogBody}><label>회의 제목<input required maxLength={120} minLength={2} value={meetingTitle} onChange={event => setMeetingTitle(event.target.value)} placeholder="회의 제목" /></label><label>시작 날짜·시간<input required type="datetime-local" value={meetingStart} onChange={event => setMeetingStart(event.target.value)} /></label><label>종료 날짜·시간<input required type="datetime-local" value={meetingEnd} onChange={event => setMeetingEnd(event.target.value)} /></label>{meetingError && <p role="alert" className={styles.error}>{meetingError}</p>}</div>

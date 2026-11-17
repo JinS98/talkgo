@@ -30,7 +30,8 @@
 .legend .pendingKey::before { border-style:dashed; background:#fff; }
 .legend .reviewKey::before { border-color:#b9d7cc; background:#e9f6f0; }
 .legend .meetingKey::before { border-color:#c7d8f0; background:#edf4ff; }
-.note { margin:12px 0 0; color:#8893a3; font-size:11px; }
+.filterDescription { margin:-5px 0 13px; color:#778294; font-size:11px; line-height:1.5; }
+.empty { margin:0 0 12px; padding:10px 12px; border:1px solid #e2e6ed; border-radius:7px; background:#fafbfc; color:#778294; font-size:11px; }
 .error,.loading { margin:0 0 12px; padding:10px 12px; border-radius:7px; font-size:12px; }
 .error { border:1px solid #f1d5db; background:#fff2f4; color:#9c3e50; }
 .loading { color:#778294; }

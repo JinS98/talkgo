@@ -76,6 +76,19 @@ try {
   assert.equal((await db.collection('meetings').get()).size, 1);
   await page.getByRole('button', { name: '내 담당 업무' }).click();
   assert.equal(await page.getByTitle(/^회의 · 팀 주간 회의 ·/).count(), 0);
+  await page.getByText('선택한 범위에 표시할 일정이 없습니다.').waitFor();
+  await db.doc('tasks/calendar-review-task').set({
+    workspaceId, title: '검수 대상 업무', status: 'REVIEW_PENDING', requesterId: owner.uid, assigneeId: member.uid,
+    reviewRequired: true, reviewCycle: 1, createdAt: now,
+    dueDate: Timestamp.fromMillis(now.toMillis() + 6 * 86_400_000),
+    reviewSubmittedAt: Timestamp.fromMillis(now.toMillis() + 3 * 86_400_000),
+    reviewDeadlineAt: Timestamp.fromMillis(now.toMillis() + 4 * 86_400_000),
+  });
+  await page.getByRole('button', { name: '내가 검수할 업무' }).click();
+  await page.getByTitle(/^검수 · 검수 대상 업무 ·/).waitFor();
+  assert.equal(await page.getByTitle(/^회의 · 팀 주간 회의 ·/).count(), 0);
+  assert.equal(await page.getByTitle(/^캘린더 일정 1 ·/).count(), 0);
+  assert.equal(await page.getByRole('button', { name: '내가 검수할 업무' }).getAttribute('aria-pressed'), 'true');
   await page.getByRole('button', { name: '팀 전체 일정' }).click();
   const memberPage = await (await browser.newContext()).newPage();
   memberPage.on('pageerror', error => errors.push(error.message));
@@ -85,9 +98,16 @@ try {
   await memberPage.getByRole('button', { name: '이메일로 로그인' }).click();
   await memberPage.getByRole('button', { name: '캘린더' }).click();
   await memberPage.getByTitle(/^회의 · 팀 주간 회의 ·/).waitFor();
+  await memberPage.getByRole('button', { name: '내 담당 업무' }).click();
+  await memberPage.getByTitle(/^검수 대상 업무 ·/).first().waitFor();
+  assert.equal(await memberPage.getByTitle(/^검수 · 검수 대상 업무 ·/).count(), 0);
+  assert.equal(await memberPage.getByTitle(/^회의 · 팀 주간 회의 ·/).count(), 0);
+  await memberPage.getByRole('button', { name: '내가 검수할 업무' }).click();
+  await memberPage.getByText('선택한 범위에 표시할 일정이 없습니다.').waitFor();
+  assert.equal(await memberPage.getByTitle(/^검수 · 검수 대상 업무 ·/).count(), 0);
   if (process.env.TASKGO_CAPTURE_UI) await page.screenshot({ path: resolve(root, '.tmp-ui-calendar.png') });
   assert.deepEqual(errors, []);
-  console.log('PASS: FullCalendar task contrast, overflow popover, meeting creation, member visibility, and filters.');
+  console.log('PASS: FullCalendar team, assignee, and reviewer filters; overflow, meetings, and empty states.');
 } finally {
   await browser?.close();
   await vite?.close();

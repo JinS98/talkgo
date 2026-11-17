@@ -55,7 +55,7 @@ export function buildCalendarEvents(tasks: CalendarTaskInput[], meetings: Calend
       events.push({ id: `task:${task.id}`, title: task.title, allDay: true, ...taskRange,
         extendedProps: { kind: 'task', taskId: task.id, status: task.status, startsAt: task.createdAt.toISOString(), endsAt: task.dueDate.toISOString() } });
     }
-    if (reviewRange) {
+    if (reviewRange && filter !== 'mine') {
       events.push({ id: `review:${task.id}:${task.reviewCycle}`, title: `검수 · ${task.title}`, allDay: true, ...reviewRange,
         extendedProps: { kind: 'review', taskId: task.id, status: task.status, startsAt: task.reviewSubmittedAt!.toISOString(), endsAt: task.reviewDeadlineAt!.toISOString() } });
     }
