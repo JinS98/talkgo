@@ -61,6 +61,7 @@ try {
   const guest = await account('guest', 'guest@example.com');
   const stranger = await account('stranger', 'stranger@gmail.com');
   const unverified = await account('unverified', 'unverified@gmail.com');
+  const revokeGuest = await account('revoke-guest', 'revoke-guest@example.com');
 
   assert.equal(owner.user.emailVerified, false);
   const unverifiedWorkspaceId = await createWorkspace(unverified, 'Immediate Team');
@@ -99,6 +100,16 @@ try {
   assert.equal(results.filter((result) => result.status === 'rejected').length, 1);
   assert.equal((await adminDb.doc(`workspaceInvites/${race.inviteId}`).get()).get('status'), 'accepted');
 
+  const revokeRace = (await owner.call('inviteMember', { workspaceId, email: revokeGuest.user.email })).data;
+  const revokeRaceResults = await Promise.allSettled([
+    owner.call('revokeInvite', { inviteId: revokeRace.inviteId }),
+    revokeGuest.call('acceptInvite', { inviteId: revokeRace.inviteId, token: new URL(revokeRace.link).searchParams.get('token') }),
+  ]);
+  assert.equal(revokeRaceResults.filter((result) => result.status === 'fulfilled').length, 1);
+  const revokeRaceStatus = (await adminDb.doc(`workspaceInvites/${revokeRace.inviteId}`).get()).get('status');
+  assert.ok(['accepted', 'revoked'].includes(revokeRaceStatus));
+  assert.equal((await adminDb.doc(`workspaces/${workspaceId}/members/${revokeGuest.user.uid}`).get()).exists, revokeRaceStatus === 'accepted');
+
   rules = await initializeTestEnvironment({ projectId, firestore: { host: '127.0.0.1', port: firestorePort } });
   const ownerDb = rules.authenticatedContext(owner.user.uid).firestore();
   const guestDb = rules.authenticatedContext(guest.user.uid).firestore();
@@ -132,14 +143,27 @@ try {
   await assertSucceeds(guestDb.doc('messages/channel-message').get());
   await assertFails(guestDb.doc('messages/dm-message').get());
   await assertSucceeds(ownerDb.doc('messages/dm-message').get());
+  await assertSucceeds(ownerDb.collection('messages').where('workspaceId', '==', workspaceId).where('sourceType', '==', 'dm').where('dmRoomId', '==', 'private').get());
+  await assertFails(guestDb.collection('messages').where('workspaceId', '==', workspaceId).where('sourceType', '==', 'dm').where('dmRoomId', '==', 'private').get());
+  await assertFails(guestDb.collection('messages').where('workspaceId', '==', workspaceId).get());
+  await assertSucceeds(ownerDb.doc('dmRooms/private').get());
+  await assertFails(guestDb.doc('dmRooms/private').get());
   await assertSucceeds(guestDb.doc('tasks/sample').get());
   await assertFails(unknownDb.doc('tasks/sample').get());
   await assertFails(ownerDb.doc('messages/channel-message').set({ workspaceId, content: 'forged' }));
   await assertFails(guestDb.doc(workspacePath).update({ ownerId: guest.user.uid }));
   await rejected(guest.call('listInvites', { workspaceId }), 'permission-denied');
-  assert.ok((await owner.call('listInvites', { workspaceId })).data.invites.length >= 4);
+  const listedInvites = (await owner.call('listInvites', { workspaceId })).data.invites;
+  assert.ok(listedInvites.length >= 4);
+  assert.deepEqual(Object.keys(listedInvites[0]).sort(), ['email', 'expiresAt', 'inviteId', 'status']);
 
-  console.log('Workspace creation, invitation lifecycle, concurrent acceptance, and member-scoped Firestore rules passed.');
+  await adminDb.doc(`${workspacePath}/members/${guest.user.uid}`).delete();
+  await assertFails(guestDb.doc(workspacePath).get());
+  await assertFails(guestDb.doc('messages/channel-message').get());
+  await assertFails(guestDb.doc('tasks/sample').get());
+  await assertSucceeds(ownerDb.doc('tasks/sample').get());
+
+  console.log('Workspace creation, invitation lifecycle/races, DM queries, and revoked membership rules passed.');
 } finally {
   if (rules) await rules.cleanup();
   for (const app of apps) await deleteApp(app);

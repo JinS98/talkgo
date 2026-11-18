@@ -42,6 +42,8 @@ Calendar의 업무 바는 생성일부터 마감일까지 이어집니다. 한 �
 
 `npm run test:task-links`는 Auth·Firestore 에뮬레이터와 Chrome에서 채널·DM 왕복 이동, 오래된 메시지로 이동, DM 비참여자의 원본 접근 차단을 확인합니다. 실행 전 `dev:all`을 종료하고 Java 21 이상을 사용하세요.
 
+보안·통합 검증은 `npm run test:workspace`, `npm run test:socket`, `npm run test:task-model`, `npm run test:task-links`를 순서대로 실행합니다. 초대 링크·멤버십·Firestore 규칙·소켓 룸·업무 경합의 점검 항목과 로컬 결과는 [32일차 검증 체크리스트](docs/daily/day-32.md)에 기록했습니다. 각 명령은 기본 에뮬레이터 포트를 사용하므로 실행 중인 `dev:all`을 먼저 종료하세요.
+
 Auth·Firestore 에뮬레이터를 실행한 뒤 `npm run dev:socket:emulator`로 소켓 서버를 별도 실행합니다. `http://127.0.0.1:3001/healthz`에서 상태를 확인할 수 있습니다. `npm run test:socket`은 서버 권한·저장·타이핑 전파를, `npm run test:live-chat`은 Auth·Firestore·Functions 에뮬레이터와 두 Chrome 세션으로 채널·DM 업무 요청, 진행 시작·마감 협의·이력, 웹 송수신·과거 내역·오프라인 복구를 검증합니다. 두 테스트는 기존 에뮬레이터·소켓 서버를 종료한 상태에서 실행하세요. 설정과 이벤트 설명은 [소켓 서버 문서](apps/socket-server/README.md)를 참고하세요.
 
 `npm run test:task-model`은 별도 Auth·Firestore·Functions 에뮬레이터에서 업무 스키마·권한·DM 원문 보호, 요청·진행 상태 전이와 이력 접근 권한을 확인합니다. 기본 포트를 사용하므로 `npm run dev:all`을 종료한 뒤 실행하세요. 요청 필드와 상태 정책은 [데이터 모델](docs/03-data-model.md)에 정리했습니다.
