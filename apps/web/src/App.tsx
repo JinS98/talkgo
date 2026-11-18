@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import type { Auth } from 'firebase/auth';
 import { doc, getDocFromServer, type Firestore, type Timestamp } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
@@ -7,7 +7,7 @@ import { ChatPanel } from './features/chat/ChatPanel';
 import { LiveChatPanel } from './features/chat/LiveChatPanel';
 import { TaskBoardPanel } from './features/tasks/TaskBoardPanel';
 import { NotificationCenter } from './features/notifications/NotificationCenter';
-import { TaskCalendarPanel } from './features/tasks/TaskCalendarPanel';
+import { useWorkspaceTasks } from './features/tasks/useWorkspaceTasks';
 import { defaultChannelId, type ConversationSelection } from './features/chat/demoConversations';
 import { useWorkspaceConversations } from './features/chat/useWorkspaceConversations';
 import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
@@ -15,6 +15,8 @@ import { liveRoomKey, useLiveChatStore } from './features/chat/useLiveChatStore'
 import type { TaskRecord } from '@taskgo/contracts/task';
 import type { AppView } from './types/domain';
 import styles from './App.module.scss';
+
+const TaskCalendarPanel = lazy(() => import('./features/tasks/TaskCalendarPanel').then((module) => ({ default: module.TaskCalendarPanel })));
 
 const upcomingAreas = [
   { id: 'chat', title: '채팅', description: '팀의 대화를 나누고 업무의 출발점을 만듭니다.' },
@@ -45,6 +47,7 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   const openMessage = useWorkspaceNavigationStore((state) => state.openMessage);
   const liveChat = Boolean(auth && db && functions && workspaceId && userId);
   const { channels, directMessages, memberEmails, memberNames, error: conversationError } = useWorkspaceConversations(db, workspaceId, userId);
+  const taskState = useWorkspaceTasks(db, workspaceId, userId);
 
   useEffect(() => {
     if (liveChat && workspaceId) selectConversation({ kind: 'channel', id: defaultChannelId(workspaceId), name: '전체' });
@@ -91,10 +94,10 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   return (
     <WorkspaceLayout workspaceControls={workspaceControls} accountControls={accountControls} notificationControls={liveChat && auth && db && functions && workspaceId && userId ? <NotificationCenter key={`${workspaceId}:${userId}`} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} /> : null} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} conversationError={conversationError}>
       {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? liveChat && auth && functions && workspaceId && userId
-        ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} db={db!} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} memberNames={memberNames} focusedMessageId={focusedMessageId} onOpenTask={openTask} />
+        ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} memberNames={memberNames} taskState={taskState} focusedMessageId={focusedMessageId} onOpenTask={openTask} />
         : <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : activeView === 'board' && liveChat && auth && db && functions && workspaceId && userId
-          ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} memberNames={memberNames} focusedTaskId={focusedTaskId} onOpenSource={openSource} /> : activeView === 'calendar' && liveChat && auth && db && functions && workspaceId && userId
-            ? <TaskCalendarPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} /> : currentView && <>
+          ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} viewerId={userId} memberNames={memberNames} taskState={taskState} focusedTaskId={focusedTaskId} onOpenSource={openSource} /> : activeView === 'calendar' && liveChat && auth && db && functions && workspaceId && userId
+            ? <Suspense fallback={<p className={styles.viewLoading} role="status">캘린더 불러오는 중…</p>}><TaskCalendarPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} taskState={taskState} /></Suspense> : currentView && <>
       <section className={styles.hero} aria-labelledby="hero-title">
         <p className={styles.eyebrow}>{currentView.eyebrow}</p>
         <h1 id="hero-title" aria-live="polite">{currentView.title}</h1>

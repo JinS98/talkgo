@@ -79,10 +79,12 @@ try {
   const recentCard = ownerPage.getByRole('article').filter({ hasText: '최근 채널 업무' });
   await recentCard.waitFor();
   assert.match(await recentCard.getAttribute('class'), /focusedCard/);
+  await ownerPage.waitForFunction(() => document.activeElement?.getAttribute('data-task-id') === 'links-recent');
   await ownerPage.getByRole('article').filter({ hasText: '오래된 채널 업무' }).getByRole('button', { name: '원본 대화 보기' }).click();
   const oldSource = ownerPage.getByRole('listitem').filter({ hasText: '오래된 채널 원본' });
   await oldSource.waitFor();
   assert.match(await oldSource.getAttribute('class'), /focusedMessage/);
+  await ownerPage.waitForFunction(() => document.activeElement?.getAttribute('data-message-id') === 'links-channel-0');
   await ownerPage.getByRole('button', { name: '링크 팀원' }).click();
   const dmSource = ownerPage.getByRole('listitem').filter({ hasText: '비공개 원본' });
   await dmSource.hover();
@@ -90,6 +92,28 @@ try {
   await ownerPage.getByRole('article').filter({ hasText: 'DM 후속 업무' }).getByRole('button', { name: '원본 대화 보기' }).click();
   await dmSource.waitFor();
   assert.match(await dmSource.getAttribute('class'), /focusedMessage/);
+
+  for (const width of [390, 320]) {
+    await ownerPage.setViewportSize({ width, height: 844 });
+    for (const view of ['채팅', '업무 보드', '캘린더']) {
+      await ownerPage.getByRole('button', { name: view, exact: true }).click();
+      if (view === '캘린더') {
+        await ownerPage.locator('[data-date][role="cell"]').first().waitFor();
+      }
+      const size = await ownerPage.evaluate(() => ({ viewport: window.innerWidth, page: document.documentElement.scrollWidth }));
+      assert.ok(size.page <= size.viewport, `${view} has page overflow at ${width}px: ${JSON.stringify(size)}`);
+    }
+  }
+  await ownerPage.getByRole('button', { name: '채팅', exact: true }).click();
+  await dmSource.hover();
+  await dmSource.getByRole('button', { name: '업무 요청' }).click();
+  const taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
+  await taskDialog.waitFor();
+  const bounds = await taskDialog.boundingBox();
+  assert.ok(bounds && bounds.x >= 0 && bounds.x + bounds.width <= 320, `Task dialog must fit a 320px viewport: ${JSON.stringify(bounds)}`);
+  await ownerPage.keyboard.press('Escape');
+  await taskDialog.waitFor({ state: 'hidden' });
+  await ownerPage.setViewportSize({ width: 1280, height: 720 });
 
   const outsiderPage = await (await browser.newContext()).newPage();
   outsiderPage.on('pageerror', (error) => errors.push(error.message));
@@ -100,7 +124,7 @@ try {
   await privateCard.getByRole('alert').getByText('원본 대화를 볼 권한이 없거나 연결할 수 없습니다.').waitFor();
   assert.equal(await outsiderPage.getByText('비공개 원본').count(), 0);
   assert.deepEqual(errors, []);
-  console.log('Task/message links, older message focus, and DM permission checks passed.');
+  console.log('Task/message links, keyboard focus, mobile layouts, and DM permission checks passed.');
 } finally {
   await browser?.close();
   await vite?.close();

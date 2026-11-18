@@ -85,7 +85,7 @@ try {
     reviewDeadlineAt: Timestamp.fromMillis(now.toMillis() + 4 * 86_400_000),
   });
   await page.getByRole('button', { name: '내가 검수할 업무' }).click();
-  await page.getByTitle(/^검수 · 검수 대상 업무 ·/).waitFor();
+  await page.getByTitle(/^검수 · 검수 대상 업무 ·/).first().waitFor();
   assert.equal(await page.getByTitle(/^회의 · 팀 주간 회의 ·/).count(), 0);
   assert.equal(await page.getByTitle(/^캘린더 일정 1 ·/).count(), 0);
   assert.equal(await page.getByRole('button', { name: '내가 검수할 업무' }).getAttribute('aria-pressed'), 'true');

@@ -11,12 +11,11 @@ import '@fullcalendar/react/themes/classic/palette.css';
 import { getIdToken, type Auth } from 'firebase/auth';
 import { collection, onSnapshot, query, Timestamp, where, type Firestore } from 'firebase/firestore';
 import { httpsCallable, type Functions } from 'firebase/functions';
-import type { TaskRecord } from '@taskgo/contracts/task';
+import type { WorkspaceTaskState } from './useWorkspaceTasks';
 import { buildCalendarEvents, canProposeCalendarDue, koreanDateKey, shiftedCalendarDueDate, type CalendarFilter } from './calendarEvents';
 import { respondTask, taskResponseError } from './taskResponseApi';
 import styles from './TaskCalendarPanel.module.scss';
 
-type CalendarTask = TaskRecord<Timestamp> & { id: string };
 type MeetingRecord = { id: string; title: string; startsAt: Timestamp; endsAt: Timestamp };
 type DueProposalDraft = { taskId: string; dueLocal: string };
 const calendarPlugins = [dayGridPlugin, interactionPlugin, classicThemePlugin];
@@ -38,17 +37,14 @@ function eventTitle(info: MountInfo<EventDisplayInfo>) {
   if (startsAt && endsAt) info.el.title = `${info.event.title} · ${dateTime.format(new Date(startsAt))} ~ ${dateTime.format(new Date(endsAt))}`;
 }
 
-export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }: { auth: Auth; db: Firestore; functions: Functions; workspaceId: string; viewerId: string }) {
+export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId, taskState }: { auth: Auth; db: Firestore; functions: Functions; workspaceId: string; viewerId: string; taskState: WorkspaceTaskState }) {
   const calendarRef = useRef<CalendarRef>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const proposalDialogRef = useRef<HTMLDialogElement>(null);
   const [month, setMonth] = useState(() => koreanDateKey(new Date()).slice(0, 7));
   const [filter, setFilter] = useState<CalendarFilter>('team');
-  const [tasks, setTasks] = useState<CalendarTask[]>([]);
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
-  const [tasksLoaded, setTasksLoaded] = useState(false);
   const [meetingsLoaded, setMeetingsLoaded] = useState(false);
-  const [taskLoadError, setTaskLoadError] = useState('');
   const [meetingLoadError, setMeetingLoadError] = useState('');
   const [meetingOpen, setMeetingOpen] = useState(false);
   const [meetingTitle, setMeetingTitle] = useState('');
@@ -63,11 +59,7 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
   const [responseError, setResponseError] = useState<{ taskId: string; message: string } | null>(null);
   const [actionNotice, setActionNotice] = useState('');
 
-  useEffect(() => onSnapshot(query(collection(db, 'tasks'), where('workspaceId', '==', workspaceId)), snapshot => {
-    setTasks(snapshot.docs.map(item => ({ ...item.data() as TaskRecord<Timestamp>, id: item.id })));
-    setTasksLoaded(true);
-    setTaskLoadError('');
-  }, () => { setTasksLoaded(true); setTaskLoadError('업무 일정을 불러오지 못했습니다. 연결 상태를 확인해 주세요.'); }), [db, workspaceId]);
+  const { tasks, loading: tasksLoading, error: taskLoadError } = taskState;
   useEffect(() => onSnapshot(query(collection(db, 'meetings'), where('workspaceId', '==', workspaceId)), snapshot => {
     setMeetings(snapshot.docs.map(item => ({ ...item.data() as Omit<MeetingRecord, 'id'>, id: item.id })));
     setMeetingsLoaded(true);
@@ -95,7 +87,7 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId }
   })), meetings.filter(meeting => meeting.startsAt instanceof Timestamp && meeting.endsAt instanceof Timestamp).map(meeting => ({
     id: meeting.id, title: meeting.title, startsAt: meeting.startsAt.toDate(), endsAt: meeting.endsAt.toDate(),
   })), filter, viewerId), [tasks, meetings, filter, viewerId]);
-  const loading = !tasksLoaded || filter === 'team' && !meetingsLoaded;
+  const loading = tasksLoading || filter === 'team' && !meetingsLoaded;
   const loadError = taskLoadError || filter === 'team' && meetingLoadError;
   const draftTask = dueProposal ? tasks.find(task => task.id === dueProposal.taskId) : undefined;
   const pendingRequests = tasks.filter(task => task.requesterId === viewerId && task.proposedDueDate instanceof Timestamp

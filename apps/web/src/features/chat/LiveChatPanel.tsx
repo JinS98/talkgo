@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { getIdToken, type Auth } from 'firebase/auth';
 import type { Functions } from 'firebase/functions';
-import { collection, onSnapshot, query, where, type Firestore, type Timestamp } from 'firebase/firestore';
-import type { TaskRecord } from '@taskgo/contracts/task';
 import { io, type Socket } from 'socket.io-client';
 import type { ClientToServerEvents, RoomTarget, ServerToClientEvents, SocketAck } from '@taskgo/contracts';
 import { socketUrl } from '../../config/env';
@@ -10,6 +8,7 @@ import { getConversationName, type ConversationSelection } from './demoConversat
 import { liveRoomKey, useLiveChatStore, type LiveChatMessage } from './useLiveChatStore';
 import { useRoomHistory } from './useRoomHistory';
 import { TaskCreateDialog } from '../tasks/TaskCreateDialog';
+import type { WorkspaceTask, WorkspaceTaskState } from '../tasks/useWorkspaceTasks';
 import styles from './ChatPanel.module.scss';
 
 type ChatSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -24,9 +23,8 @@ function pendingMessage(viewerId: string, content: string): LiveChatMessage {
   return { clientMessageId: crypto.randomUUID(), senderId: viewerId, content, createdAt: Date.now(), status: 'sending' };
 }
 
-export function LiveChatPanel({ auth, db, functions, conversation, workspaceId, viewerId, senderName, memberEmails, memberNames, focusedMessageId, onOpenTask }: {
+export function LiveChatPanel({ auth, functions, conversation, workspaceId, viewerId, senderName, memberEmails, memberNames, taskState, focusedMessageId, onOpenTask }: {
   auth: Auth;
-  db: Firestore;
   functions: Functions;
   conversation: ConversationSelection;
   workspaceId: string;
@@ -34,6 +32,7 @@ export function LiveChatPanel({ auth, db, functions, conversation, workspaceId, 
   senderName: string;
   memberEmails: Record<string, string>;
   memberNames: Record<string, string>;
+  taskState: WorkspaceTaskState;
   focusedMessageId: string | null;
   onOpenTask: (taskId: string) => void;
 }) {
@@ -54,8 +53,6 @@ export function LiveChatPanel({ auth, db, functions, conversation, workspaceId, 
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [taskSource, setTaskSource] = useState<LiveChatMessage | null>(null);
   const [taskNotice, setTaskNotice] = useState('');
-  const [linkedTasks, setLinkedTasks] = useState<(TaskRecord<Timestamp> & { id: string })[]>([]);
-  const [taskLinkError, setTaskLinkError] = useState(false);
   const socketRef = useRef<ChatSocket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const focusedRef = useRef<string | null>(null);
@@ -64,11 +61,15 @@ export function LiveChatPanel({ auth, db, functions, conversation, workspaceId, 
   const conversationName = getConversationName(conversation);
   const title = `${conversation.kind === 'channel' ? '# ' : ''}${conversationName}`;
   const isTyping = composerFocused && Boolean(draft.trim());
-
-  useEffect(() => onSnapshot(query(collection(db, 'tasks'), where('workspaceId', '==', workspaceId)), (snapshot) => {
-    setLinkedTasks(snapshot.docs.map((item) => ({ ...item.data() as TaskRecord<Timestamp>, id: item.id })));
-    setTaskLinkError(false);
-  }, () => setTaskLinkError(true)), [db, workspaceId]);
+  const tasksBySource = useMemo(() => {
+    const links = new Map<string, WorkspaceTask[]>();
+    for (const task of taskState.tasks) {
+      const related = links.get(task.sourceMessageId) ?? [];
+      related.push(task);
+      links.set(task.sourceMessageId, related);
+    }
+    return links;
+  }, [taskState.tasks]);
 
   useEffect(() => {
     if (!focusedMessageId || focusedRef.current === focusedMessageId) return;
@@ -76,6 +77,7 @@ export function LiveChatPanel({ auth, db, functions, conversation, workspaceId, 
       .find((item) => item.dataset.messageId === focusedMessageId);
     if (!element) return;
     element.scrollIntoView({ block: 'center' });
+    element.focus({ preventScroll: true });
     focusedRef.current = focusedMessageId;
   }, [focusedMessageId, messages]);
 
@@ -267,7 +269,7 @@ export function LiveChatPanel({ auth, db, functions, conversation, workspaceId, 
     {error && <div className={styles.connectionError} role="alert">{error}{connection !== 'offline' && <button type="button" onClick={() => { setError(''); setConnection('connecting'); if (socketRef.current?.connected) socketRef.current.disconnect(); socketRef.current?.connect(); }}>다시 연결</button>}</div>}
     {sendError && <div className={styles.sendError} role="alert">{sendError}<button type="button" onClick={() => setSendError('')} aria-label="전송 오류 닫기">×</button></div>}
     {taskNotice && <div className={styles.taskNotice} role="status">{taskNotice}<button type="button" onClick={() => setTaskNotice('')} aria-label="업무 알림 닫기">×</button></div>}
-    {taskLinkError && <div className={styles.connectionError} role="alert">연결된 업무를 불러오지 못했습니다.</div>}
+    {taskState.error && <div className={styles.connectionError} role="alert">연결된 업무를 불러오지 못했습니다.</div>}
     {history.error && <div className={styles.connectionError} role="alert">{history.error}<button type="button" onClick={() => void history.refresh()}>다시 불러오기</button></div>}
     <div className={styles.messages} ref={scrollRef} onScroll={history.onScroll} aria-label="메시지 목록">
       <div className={styles.historyControls}>
@@ -280,8 +282,8 @@ export function LiveChatPanel({ auth, db, functions, conversation, workspaceId, 
         {messages.map((message) => {
           const own = message.senderId === viewerId;
           const author = own ? senderName : memberNames[message.senderId] ?? '팀원';
-          const related = message.messageId ? linkedTasks.filter((task) => task.sourceMessageId === message.messageId) : [];
-          return <li className={`${styles.message} ${own ? styles.own : ''} ${message.messageId === focusedMessageId ? styles.focusedMessage : ''}`} data-message-id={message.messageId} key={message.messageId ?? `${message.senderId}:${message.clientMessageId}`}>
+          const related = message.messageId ? tasksBySource.get(message.messageId) ?? [] : [];
+          return <li className={`${styles.message} ${own ? styles.own : ''} ${message.messageId === focusedMessageId ? styles.focusedMessage : ''}`} data-message-id={message.messageId} tabIndex={message.messageId === focusedMessageId ? -1 : undefined} key={message.messageId ?? `${message.senderId}:${message.clientMessageId}`}>
             <span className={styles.avatar} aria-hidden="true">{(own ? senderName : author).charAt(0).toUpperCase()}</span>
             <div className={styles.messageBody}><div className={styles.messageMeta}><strong>{author}</strong><time>{new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: '2-digit' }).format(message.createdAt)}</time>{own && <span className={message.status === 'failed' ? styles.failed : ''}>{message.status === 'sending' ? '전송 중…' : message.status === 'failed' ? '전송 실패' : '전송됨'}</span>}</div><p>{message.content}</p>{own && message.status === 'failed' && <button className={styles.retry} type="button" disabled={connection !== 'ready'} onClick={() => retry(message)}>다시 시도</button>}{message.messageId && <span className={styles.messageToolbar}><button className={styles.taskAction} type="button" onClick={() => { setTaskNotice(''); setTaskSource(message); }}>＋ 업무 요청</button>{related.map((task) => <button className={styles.linkedTask} type="button" key={task.id} title={task.title} onClick={() => onOpenTask(task.id)}>업무 보기 · {task.title}</button>)}</span>}</div>
           </li>;

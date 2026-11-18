@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Auth } from 'firebase/auth';
 import { collection, onSnapshot, query, Timestamp, where, type Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
-import type { TaskEventAction, TaskEventRecord, TaskRecord, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
+import type { TaskEventAction, TaskEventRecord, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
 import { respondTask, taskResponseError } from './taskResponseApi';
+import type { WorkspaceTask, WorkspaceTaskState } from './useWorkspaceTasks';
 import styles from './TaskBoardPanel.module.scss';
 
-type BoardTask = TaskRecord<Timestamp> & { id: string };
+type BoardTask = WorkspaceTask;
 type BoardEvent = TaskEventRecord<Timestamp> & { id: string };
 type Filter = 'all' | 'requested' | 'active' | 'finished';
 type Scope = 'team' | 'assigned' | 'requested';
@@ -128,7 +129,7 @@ function TaskCard({ task, auth, db, functions, viewerId, memberNames, onNotice, 
     }
   }
 
-  return <article className={`${styles.card} ${focused ? styles.focusedCard : ''}`} data-task-id={task.id}>
+  return <article className={`${styles.card} ${focused ? styles.focusedCard : ''}`} data-task-id={task.id} tabIndex={focused ? -1 : undefined}>
     <div className={styles.cardTop}><span className={`${styles.status} ${task.status === 'REQUESTED' ? styles.requested : task.status === 'REWORK' ? styles.rework : task.status === 'REVIEW_PENDING' ? styles.reviewPending : ''}`}>{statusLabels[task.status]}</span><span className={styles.due}>마감 {formatDate(task.dueDate)}</span></div>
     <h2>{task.title}</h2>
     {task.description && <p className={styles.description}>{task.description}</p>}
@@ -171,36 +172,29 @@ function TaskCard({ task, auth, db, functions, viewerId, memberNames, onNotice, 
   </article>;
 }
 
-export function TaskBoardPanel({ auth, db, functions, workspaceId, viewerId, memberNames, focusedTaskId, onOpenSource }: {
-  auth: Auth; db: Firestore; functions: Functions; workspaceId: string;
+export function TaskBoardPanel({ auth, db, functions, viewerId, memberNames, taskState, focusedTaskId, onOpenSource }: {
+  auth: Auth; db: Firestore; functions: Functions;
   viewerId: string; memberNames: Record<string, string>;
+  taskState: WorkspaceTaskState;
   focusedTaskId: string | null; onOpenSource: (task: BoardTask) => Promise<void>;
 }) {
   const boardRef = useRef<HTMLElement>(null);
   const scrolledTaskRef = useRef<string | null>(null);
-  const [snapshotState, setSnapshotState] = useState<{ workspaceId: string; tasks: BoardTask[]; error: string } | null>(null);
   const [notice, setNotice] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [scope, setScope] = useState<Scope>('team');
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    return onSnapshot(query(collection(db, 'tasks'), where('workspaceId', '==', workspaceId)), (snapshot) => {
-      setSnapshotState({ workspaceId, tasks: snapshot.docs.map((item) => ({ ...item.data() as TaskRecord<Timestamp>, id: item.id })).sort((a, b) => a.dueDate.toMillis() - b.dueDate.toMillis() || a.id.localeCompare(b.id)), error: '' });
-    }, () => { setSnapshotState({ workspaceId, tasks: [], error: '업무 목록을 불러오지 못했습니다. 연결 상태를 확인해 주세요.' }); });
-  }, [db, workspaceId]);
-
-  const loading = snapshotState?.workspaceId !== workspaceId;
-  const tasks = useMemo(() => loading ? [] : snapshotState?.tasks ?? [], [loading, snapshotState]);
+  const { tasks, loading, error } = taskState;
   useEffect(() => {
     if (!focusedTaskId || loading || scrolledTaskRef.current === focusedTaskId) return;
     const card = Array.from(boardRef.current?.querySelectorAll<HTMLElement>('[data-task-id]') ?? [])
       .find((item) => item.dataset.taskId === focusedTaskId);
     if (!card) return;
     card.scrollIntoView({ block: 'center' });
+    card.focus({ preventScroll: true });
     scrolledTaskRef.current = focusedTaskId;
   }, [focusedTaskId, loading, tasks]);
-  const error = loading ? '' : snapshotState?.error ?? '';
   const term = search.trim().toLocaleLowerCase('ko-KR');
   const scopedTasks = tasks.filter((task) => (scope === 'team' || scope === 'assigned' && task.assigneeId === viewerId || scope === 'requested' && task.requesterId === viewerId)
     && (!term || task.title.toLocaleLowerCase('ko-KR').includes(term)));
