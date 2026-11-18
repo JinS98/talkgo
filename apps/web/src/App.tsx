@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import type { Auth } from 'firebase/auth';
-import type { Firestore } from 'firebase/firestore';
+import { doc, getDocFromServer, type Firestore, type Timestamp } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
 import { WorkspaceLayout } from './components/layout/WorkspaceLayout';
 import { ChatPanel } from './features/chat/ChatPanel';
@@ -11,6 +11,8 @@ import { TaskCalendarPanel } from './features/tasks/TaskCalendarPanel';
 import { defaultChannelId, type ConversationSelection } from './features/chat/demoConversations';
 import { useWorkspaceConversations } from './features/chat/useWorkspaceConversations';
 import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
+import { liveRoomKey, useLiveChatStore } from './features/chat/useLiveChatStore';
+import type { TaskRecord } from '@taskgo/contracts/task';
 import type { AppView } from './types/domain';
 import styles from './App.module.scss';
 
@@ -37,6 +39,10 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
   const selectConversation = useWorkspaceNavigationStore((state) => state.selectConversation);
+  const focusedTaskId = useWorkspaceNavigationStore((state) => state.focusedTaskId);
+  const focusedMessageId = useWorkspaceNavigationStore((state) => state.focusedMessageId);
+  const openTask = useWorkspaceNavigationStore((state) => state.openTask);
+  const openMessage = useWorkspaceNavigationStore((state) => state.openMessage);
   const liveChat = Boolean(auth && db && functions && workspaceId && userId);
   const { channels, directMessages, memberEmails, memberNames, error: conversationError } = useWorkspaceConversations(db, workspaceId, userId);
 
@@ -53,12 +59,41 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   const showManagement = activeView === 'workspace' && canManageWorkspace;
   const currentView = activeView === 'board' || activeView === 'calendar' ? viewCopy[activeView] : null;
 
+  async function openSource(task: TaskRecord<Timestamp>): Promise<void> {
+    if (!db || !workspaceId || !userId || task.workspaceId !== workspaceId) throw new Error('원본 대화를 확인할 수 없습니다.');
+    let snapshot;
+    try {
+      // A server read checks current channel/DM permissions even if an old copy is cached.
+      snapshot = await getDocFromServer(doc(db, 'messages', task.sourceMessageId));
+    } catch {
+      throw new Error('원본 대화를 볼 권한이 없거나 연결할 수 없습니다.');
+    }
+    if (!snapshot.exists()) throw new Error('원본 메시지를 찾을 수 없습니다.');
+    const message = snapshot.data();
+    const roomId = message[task.sourceType === 'channel' ? 'channelId' : 'dmRoomId'];
+    if (message.workspaceId !== workspaceId || message.sourceType !== task.sourceType || typeof roomId !== 'string'
+      || typeof message.senderId !== 'string' || typeof message.content !== 'string'
+      || typeof message.clientMessageId !== 'string' || !message.createdAt?.toDate) {
+      throw new Error('원본 메시지를 확인할 수 없습니다.');
+    }
+    const available = task.sourceType === 'channel' ? channels : directMessages;
+    const room = available.find((item) => item.id === roomId);
+    if (!room) throw new Error('원본 대화가 목록에 없습니다. 잠시 후 다시 시도해 주세요.');
+    const conversation: ConversationSelection = { kind: task.sourceType, id: roomId, name: room.name };
+    useLiveChatStore.getState().mergeHistory(liveRoomKey(userId, { workspaceId, kind: task.sourceType, roomId }), [{
+      workspaceId, kind: task.sourceType, roomId, messageId: snapshot.id,
+      clientMessageId: message.clientMessageId, senderId: message.senderId,
+      content: message.content, createdAt: message.createdAt.toDate().toISOString(),
+    }]);
+    openMessage(conversation, snapshot.id);
+  }
+
   return (
     <WorkspaceLayout workspaceControls={workspaceControls} accountControls={accountControls} notificationControls={liveChat && auth && db && functions && workspaceId && userId ? <NotificationCenter key={`${workspaceId}:${userId}`} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} /> : null} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} conversationError={conversationError}>
       {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? liveChat && auth && functions && workspaceId && userId
-        ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} memberNames={memberNames} />
+        ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} db={db!} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} memberNames={memberNames} focusedMessageId={focusedMessageId} onOpenTask={openTask} />
         : <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : activeView === 'board' && liveChat && auth && db && functions && workspaceId && userId
-          ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} memberNames={memberNames} /> : activeView === 'calendar' && liveChat && auth && db && functions && workspaceId && userId
+          ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} memberNames={memberNames} focusedTaskId={focusedTaskId} onOpenSource={openSource} /> : activeView === 'calendar' && liveChat && auth && db && functions && workspaceId && userId
             ? <TaskCalendarPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} /> : currentView && <>
       <section className={styles.hero} aria-labelledby="hero-title">
         <p className={styles.eyebrow}>{currentView.eyebrow}</p>

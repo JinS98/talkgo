@@ -11,6 +11,7 @@ export function useRoomHistory(
   roomKey: string,
   messages: LiveChatMessage[],
   scrollRef: RefObject<HTMLDivElement | null>,
+  focusedMessageId?: string | null,
 ) {
   const [loading, setLoading] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -20,7 +21,7 @@ export function useRoomHistory(
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
   const refreshAgainRef = useRef(false);
   const generationRef = useRef(0);
-  const atBottomRef = useRef(true);
+  const atBottomRef = useRef(!focusedMessageId);
   const anchorRef = useRef<{ height: number; top: number } | null>(null);
   const mergeHistory = useLiveChatStore((state) => state.mergeHistory);
 
@@ -52,7 +53,7 @@ export function useRoomHistory(
       setError('');
       try {
         const current = useLiveChatStore.getState().messagesByRoom[roomKey] ?? [];
-        const knownNewest = [...current].reverse().find((item) => item.messageId)?.messageId;
+        const knownNewest = focusedMessageId ? undefined : [...current].reverse().find((item) => item.messageId)?.messageId;
         let after: MessageCursor | undefined;
         let page;
         do {
@@ -80,7 +81,7 @@ export function useRoomHistory(
       }
     });
     return task;
-  }, [auth.app, mergeHistory, roomKey, target]);
+  }, [auth.app, focusedMessageId, mergeHistory, roomKey, target]);
 
   const loadOlder = useCallback(async () => {
     const cursor = cursorRef.current;
