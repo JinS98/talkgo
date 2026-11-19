@@ -7,7 +7,9 @@ import {
   type DemoDirectMessage,
 } from '../../features/chat/demoConversations';
 import { useWorkspaceNavigationStore } from '../../store/useWorkspaceNavigationStore';
+import type { WorkspaceMember } from '../../features/chat/useWorkspaceConversations';
 import type { AppView } from '../../types/domain';
+import { MemberProfilePanel } from './MemberProfilePanel';
 import styles from './WorkspaceLayout.module.scss';
 
 interface WorkspaceLayoutProps {
@@ -20,6 +22,14 @@ interface WorkspaceLayoutProps {
   liveChat?: boolean;
   channels?: DemoChannel[];
   directMessages?: DemoDirectMessage[];
+  members?: WorkspaceMember[];
+  viewerId?: string;
+  profileMember?: WorkspaceMember | null;
+  profilePending?: boolean;
+  profileError?: string;
+  onOpenProfile?: (memberId: string) => void;
+  onCloseProfile?: () => void;
+  onStartDm?: (member: WorkspaceMember) => void;
   conversationError?: string;
 }
 
@@ -39,7 +49,7 @@ function NavigationIcon({ view }: { view: AppView }) {
   return <span className={styles.navIcon}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[view]}</svg></span>;
 }
 
-export function WorkspaceLayout({ children, workspaceControls, accountControls, notificationControls, workspaceName, canManageWorkspace = false, liveChat = false, channels, directMessages, conversationError }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ children, workspaceControls, accountControls, notificationControls, workspaceName, canManageWorkspace = false, liveChat = false, channels, directMessages, members = [], viewerId = '', profileMember, profilePending = false, profileError = '', onOpenProfile, onCloseProfile, onStartDm, conversationError }: WorkspaceLayoutProps) {
   const mainRef = useRef<HTMLElement>(null);
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
@@ -55,7 +65,7 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
   useEffect(() => { if (mainRef.current) mainRef.current.scrollTop = 0; }, [activeView, workspaceName]);
 
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${profileMember ? styles.profileOpen : ''}`}>
       <a className={styles.skipLink} href="#main-content">
         본문으로 이동
       </a>
@@ -131,6 +141,17 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
             </ul>
             {liveChat && visibleDirectMessages.length === 0 && <p className={styles.sectionLabel}>아직 DM이 없습니다.</p>}
           </section>
+          {liveChat && <section aria-labelledby="members-heading">
+            <h2 id="members-heading" className={styles.sectionLabel}>멤버 <span>{members.length}</span></h2>
+            <ul className={styles.conversationList}>
+              {members.map((member) => <li key={member.uid}>
+                <button className={styles.conversationButton} type="button" onClick={() => onOpenProfile?.(member.uid)}>
+                  <span className={styles.avatar} aria-hidden="true">{member.displayName.charAt(0).toUpperCase()}</span>
+                  <span>{member.displayName}{member.uid === viewerId && ' (나)'}</span>
+                </button>
+              </li>)}
+            </ul>
+          </section>}
           {conversationError && <p role="alert" className={styles.sectionLabel}>{conversationError}</p>}
         </div>
 
@@ -151,6 +172,10 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
           {children}
         </main>
       </div>
+      {profileMember && onCloseProfile && onStartDm && <>
+        <button className={styles.profileBackdrop} type="button" aria-label="프로필 닫기" onClick={onCloseProfile} />
+        <div className={styles.profileSlot}><MemberProfilePanel member={profileMember} viewerId={viewerId} pending={profilePending} error={profileError} onClose={onCloseProfile} onMessage={onStartDm} /></div>
+      </>}
     </div>
   );
 }

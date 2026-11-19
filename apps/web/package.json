@@ -15,6 +15,7 @@
     "verify:auth": "node scripts/verify-auth.mjs",
     "verify:workspace": "node scripts/verify-workspace.mjs",
     "verify:live-chat": "node scripts/verify-live-chat.mjs",
+    "verify:member-profile": "node scripts/verify-member-profile.mjs",
     "verify:task-links": "node scripts/verify-task-links.mjs",
     "verify:calendar-browser": "node scripts/verify-calendar-browser.mjs"
   },

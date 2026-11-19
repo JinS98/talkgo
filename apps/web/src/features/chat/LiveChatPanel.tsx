@@ -23,7 +23,7 @@ function pendingMessage(viewerId: string, content: string): LiveChatMessage {
   return { clientMessageId: crypto.randomUUID(), senderId: viewerId, content, createdAt: Date.now(), status: 'sending' };
 }
 
-export function LiveChatPanel({ auth, functions, conversation, workspaceId, viewerId, senderName, memberEmails, memberNames, taskState, focusedMessageId, onOpenTask }: {
+export function LiveChatPanel({ auth, functions, conversation, workspaceId, viewerId, senderName, memberEmails, memberNames, taskState, focusedMessageId, onOpenTask, onOpenProfile }: {
   auth: Auth;
   functions: Functions;
   conversation: ConversationSelection;
@@ -35,6 +35,7 @@ export function LiveChatPanel({ auth, functions, conversation, workspaceId, view
   taskState: WorkspaceTaskState;
   focusedMessageId: string | null;
   onOpenTask: (taskId: string) => void;
+  onOpenProfile: (memberId: string) => void;
 }) {
   const target: RoomTarget = useMemo(() => ({ workspaceId, kind: conversation.kind, roomId: conversation.id }), [workspaceId, conversation.kind, conversation.id]);
   const key = liveRoomKey(viewerId, target);
@@ -284,8 +285,8 @@ export function LiveChatPanel({ auth, functions, conversation, workspaceId, view
           const author = own ? senderName : memberNames[message.senderId] ?? '팀원';
           const related = message.messageId ? tasksBySource.get(message.messageId) ?? [] : [];
           return <li className={`${styles.message} ${own ? styles.own : ''} ${message.messageId === focusedMessageId ? styles.focusedMessage : ''}`} data-message-id={message.messageId} tabIndex={message.messageId === focusedMessageId ? -1 : undefined} key={message.messageId ?? `${message.senderId}:${message.clientMessageId}`}>
-            <span className={styles.avatar} aria-hidden="true">{(own ? senderName : author).charAt(0).toUpperCase()}</span>
-            <div className={styles.messageBody}><div className={styles.messageMeta}><strong>{author}</strong><time>{new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: '2-digit' }).format(message.createdAt)}</time>{own && <span className={message.status === 'failed' ? styles.failed : ''}>{message.status === 'sending' ? '전송 중…' : message.status === 'failed' ? '전송 실패' : '전송됨'}</span>}</div><p>{message.content}</p>{own && message.status === 'failed' && <button className={styles.retry} type="button" disabled={connection !== 'ready'} onClick={() => retry(message)}>다시 시도</button>}{message.messageId && <span className={styles.messageToolbar}><button className={styles.taskAction} type="button" onClick={() => { setTaskNotice(''); setTaskSource(message); }}>＋ 업무 요청</button>{related.map((task) => <button className={styles.linkedTask} type="button" key={task.id} title={task.title} onClick={() => onOpenTask(task.id)}>업무 보기 · {task.title}</button>)}</span>}</div>
+            <button className={styles.avatarButton} type="button" aria-label={`${author} 프로필 보기`} onClick={() => onOpenProfile(message.senderId)}><span className={styles.avatar} aria-hidden="true">{(own ? senderName : author).charAt(0).toUpperCase()}</span></button>
+            <div className={styles.messageBody}><div className={styles.messageMeta}><button className={styles.authorButton} type="button" onClick={() => onOpenProfile(message.senderId)}>{author}</button><time>{new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: '2-digit' }).format(message.createdAt)}</time>{own && <span className={message.status === 'failed' ? styles.failed : ''}>{message.status === 'sending' ? '전송 중…' : message.status === 'failed' ? '전송 실패' : '전송됨'}</span>}</div><p>{message.content}</p>{own && message.status === 'failed' && <button className={styles.retry} type="button" disabled={connection !== 'ready'} onClick={() => retry(message)}>다시 시도</button>}{message.messageId && <span className={styles.messageToolbar}><button className={styles.taskAction} type="button" onClick={() => { setTaskNotice(''); setTaskSource(message); }}>＋ 업무 요청</button>{related.map((task) => <button className={styles.linkedTask} type="button" key={task.id} title={task.title} onClick={() => onOpenTask(task.id)}>업무 보기 · {task.title}</button>)}</span>}</div>
           </li>;
         })}
       </ol>

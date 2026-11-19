@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Auth } from 'firebase/auth';
 import { doc, getDocFromServer, type Firestore, type Timestamp } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
@@ -10,6 +10,8 @@ import { NotificationCenter } from './features/notifications/NotificationCenter'
 import { useWorkspaceTasks } from './features/tasks/useWorkspaceTasks';
 import { defaultChannelId, type ConversationSelection } from './features/chat/demoConversations';
 import { useWorkspaceConversations } from './features/chat/useWorkspaceConversations';
+import type { WorkspaceMember } from './features/chat/useWorkspaceConversations';
+import { callWorkspace } from './features/workspace/workspaceApi';
 import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
 import { liveRoomKey, useLiveChatStore } from './features/chat/useLiveChatStore';
 import type { TaskRecord } from '@taskgo/contracts/task';
@@ -46,8 +48,29 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   const openTask = useWorkspaceNavigationStore((state) => state.openTask);
   const openMessage = useWorkspaceNavigationStore((state) => state.openMessage);
   const liveChat = Boolean(auth && db && functions && workspaceId && userId);
-  const { channels, directMessages, memberEmails, memberNames, error: conversationError } = useWorkspaceConversations(db, workspaceId, userId);
+  const { channels, directMessages, members, memberEmails, memberNames, error: conversationError } = useWorkspaceConversations(db, workspaceId, userId);
   const taskState = useWorkspaceTasks(db, workspaceId, userId);
+  const [profileSelection, setProfileSelection] = useState<{ workspaceId: string; viewerId: string; memberId: string } | null>(null);
+  const [profilePending, setProfilePending] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [openedDm, setOpenedDm] = useState<{ workspaceId: string; viewerId: string; roomId: string } | null>(null);
+  const scopeRef = useRef(`${workspaceId}:${userId}`);
+  const profileActionRef = useRef(0);
+  useEffect(() => { scopeRef.current = `${workspaceId}:${userId}`; }, [workspaceId, userId]);
+  const profileMember = profileSelection?.workspaceId === workspaceId && profileSelection?.viewerId === userId
+    ? members.find((member) => member.uid === profileSelection?.memberId) ?? null : null;
+
+  function openProfile(memberId: string) {
+    if (!workspaceId || !userId || profilePending) return;
+    profileActionRef.current += 1;
+    setProfileSelection({ workspaceId, viewerId: userId, memberId });
+    setProfileError('');
+  }
+
+  function closeProfile() {
+    profileActionRef.current += 1;
+    setProfileSelection(null);
+  }
 
   useEffect(() => {
     if (liveChat && workspaceId) selectConversation({ kind: 'channel', id: defaultChannelId(workspaceId), name: '전체' });
@@ -56,11 +79,37 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   const defaultConversation: ConversationSelection | null = workspaceId ? { kind: 'channel', id: defaultChannelId(workspaceId), name: '전체' } : null;
   const selectedAvailable = selectedConversation.kind === 'channel'
     ? channels.some((item) => item.id === selectedConversation.id)
-    : directMessages.some((item) => item.id === selectedConversation.id);
+    : directMessages.some((item) => item.id === selectedConversation.id)
+      || openedDm?.workspaceId === workspaceId && openedDm?.viewerId === userId && openedDm?.roomId === selectedConversation.id;
   const activeConversation = liveChat && !selectedAvailable && defaultConversation ? defaultConversation : selectedConversation;
 
   const showManagement = activeView === 'workspace' && canManageWorkspace;
   const currentView = activeView === 'board' || activeView === 'calendar' ? viewCopy[activeView] : null;
+
+  async function startDm(member: WorkspaceMember) {
+    if (!auth || !functions || !workspaceId || !userId || profilePending) return;
+    const scope = `${workspaceId}:${userId}`;
+    const actionId = ++profileActionRef.current;
+    setProfilePending(true);
+    setProfileError('');
+    try {
+      const existing = directMessages.find((room) => room.participantIds?.includes(member.uid));
+      const roomId = existing?.id ?? (await callWorkspace<{ roomId: string }>(auth, functions, 'createDm', { workspaceId, memberId: member.uid })).roomId;
+      if (scopeRef.current !== scope || profileActionRef.current !== actionId) return;
+      setOpenedDm({ workspaceId, viewerId: userId, roomId });
+      selectConversation({ kind: 'dm', id: roomId, name: member.displayName });
+      closeProfile();
+    } catch (cause) {
+      if (scopeRef.current === scope && profileActionRef.current === actionId) {
+        const code = cause && typeof cause === 'object' && 'code' in cause ? String(cause.code) : '';
+        setProfileError(code === 'functions/permission-denied' ? '같은 워크스페이스 멤버끼리만 DM을 시작할 수 있습니다.'
+          : code === 'functions/unavailable' || code === 'functions/not-found' ? 'DM 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'
+            : 'DM을 열지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      }
+    } finally {
+      setProfilePending(false);
+    }
+  }
 
   async function openSource(task: TaskRecord<Timestamp>): Promise<void> {
     if (!db || !workspaceId || !userId || task.workspaceId !== workspaceId) throw new Error('원본 대화를 확인할 수 없습니다.');
@@ -92,9 +141,9 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   }
 
   return (
-    <WorkspaceLayout workspaceControls={workspaceControls} accountControls={accountControls} notificationControls={liveChat && auth && db && functions && workspaceId && userId ? <NotificationCenter key={`${workspaceId}:${userId}`} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} /> : null} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} conversationError={conversationError}>
+    <WorkspaceLayout workspaceControls={workspaceControls} accountControls={accountControls} notificationControls={liveChat && auth && db && functions && workspaceId && userId ? <NotificationCenter key={`${workspaceId}:${userId}`} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} /> : null} workspaceName={workspaceName} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} members={members} viewerId={userId} profileMember={profileMember} profilePending={profilePending} profileError={profileError} onOpenProfile={openProfile} onCloseProfile={closeProfile} onStartDm={(member) => void startDm(member)} conversationError={conversationError}>
       {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? liveChat && auth && functions && workspaceId && userId
-        ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} memberNames={memberNames} taskState={taskState} focusedMessageId={focusedMessageId} onOpenTask={openTask} />
+        ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} memberNames={memberNames} taskState={taskState} focusedMessageId={focusedMessageId} onOpenTask={openTask} onOpenProfile={openProfile} />
         : <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : activeView === 'board' && liveChat && auth && db && functions && workspaceId && userId
           ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} viewerId={userId} memberNames={memberNames} taskState={taskState} focusedTaskId={focusedTaskId} onOpenSource={openSource} /> : activeView === 'calendar' && liveChat && auth && db && functions && workspaceId && userId
             ? <Suspense fallback={<p className={styles.viewLoading} role="status">캘린더 불러오는 중…</p>}><TaskCalendarPanel key={workspaceId} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} taskState={taskState} /></Suspense> : currentView && <>

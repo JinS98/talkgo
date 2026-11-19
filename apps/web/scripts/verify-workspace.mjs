@@ -3,7 +3,7 @@ import { initializeApp as initializeAdminApp, deleteApp as deleteAdminApp } from
 import { getFirestore as getAdminFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, getIdToken, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { collection, connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 
@@ -89,6 +89,12 @@ try {
   assert.equal((await guest.call('acceptInvite', { inviteId: second.inviteId, token: secondToken })).data.workspaceId, workspaceId);
   await rejected(guest.call('acceptInvite', { inviteId: second.inviteId, token: secondToken }), 'failed-precondition');
   assert.equal((await adminDb.doc(`workspaces/${workspaceId}/members/${guest.user.uid}`).get()).get('role'), 'member');
+  await rejected(owner.call('createDm', { workspaceId, memberId: owner.user.uid }), 'invalid-argument');
+  await rejected(unverified.call('createDm', { workspaceId, memberId: guest.user.uid }), 'permission-denied');
+  const directRoomId = (await owner.call('createDm', { workspaceId, memberId: guest.user.uid })).data.roomId;
+  assert.equal((await guest.call('createDm', { workspaceId, memberId: owner.user.uid })).data.roomId, directRoomId);
+  assert.equal((await owner.call('createDm', { workspaceId, memberId: guest.user.uid })).data.roomId, directRoomId);
+  assert.deepEqual((await adminDb.doc(`dmRooms/${directRoomId}`).get()).get('participantIds').sort(), [owner.user.uid, guest.user.uid].sort());
 
   const expired = (await owner.call('inviteMember', { workspaceId, email: 'stranger@gmail.com' })).data;
   await adminDb.doc(`workspaceInvites/${expired.inviteId}`).update({ expiresAt: Timestamp.fromMillis(Date.now() - 1000) });
@@ -123,7 +129,11 @@ try {
   await adminDb.doc(`users/${owner.user.uid}`).set({ displayName: '테스트 방장', setupComplete: true, createdAt: Timestamp.now(), updatedAt: Timestamp.now() });
   await assertSucceeds(ownerProfile.get());
   await assertFails(guestDb.doc(`users/${owner.user.uid}`).get());
+  await assertSucceeds(updateDoc(doc(owner.db, 'users', owner.user.uid), { title: '기획', bio: '팀 소개', updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(owner.db, 'users', owner.user.uid), { bio: 'x'.repeat(241), updatedAt: serverTimestamp() }));
   await assertSucceeds(ownerDb.doc(`${workspacePath}/members/${owner.user.uid}`).update({ displayName: '변경한 방장' }));
+  await assertSucceeds(ownerDb.doc(`${workspacePath}/members/${owner.user.uid}`).update({ title: '기획', bio: '팀 소개' }));
+  await assertFails(guestDb.doc(`${workspacePath}/members/${owner.user.uid}`).update({ bio: '위조' }));
   await assertFails(guestDb.doc(`${workspacePath}/members/${owner.user.uid}`).update({ displayName: '위조' }));
   await assertFails(ownerDb.doc(`${workspacePath}/members/${owner.user.uid}`).update({ role: 'member' }));
   await assertFails(unknownDb.doc(workspacePath).get());

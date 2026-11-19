@@ -13,6 +13,7 @@ import { respondToTaskRequest } from './taskResponses.js';
 import { completeOverdueReviews } from './reviewTimeout.js';
 import { markReviewNotificationRead, sendReviewReminders } from './reviewNotifications.js';
 import { localTaskCandidates, openAiTaskCandidates, suggestTaskFromMessage } from './taskSuggestions.js';
+import { openDirectMessage } from './directMessages.js';
 
 initializeApp();
 const db = getFirestore();
@@ -24,6 +25,11 @@ const inviteLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 export const createTask = onCall({ region }, async (request) => {
   const user = await activeUser(request);
   return createTaskRecord(db, user.uid, request.data);
+});
+
+export const createDm = onCall({ region }, async (request) => {
+  const user = await activeUser(request);
+  return openDirectMessage(db, user.uid, request.data);
 });
 
 export const createMeeting = onCall({ region }, async (request) => {
@@ -194,9 +200,10 @@ export const acceptInvite = onCall({ region }, async (request) => {
     const workspaceId = snapshot.get('workspaceId') as string;
     const workspace = await transaction.get(db.doc(`workspaces/${workspaceId}`));
     if (!workspace.exists) throw new HttpsError('not-found', '워크스페이스가 없습니다.');
+    const profile = await transaction.get(db.doc(`users/${user.uid}`));
     const member = workspace.ref.collection('members').doc(user.uid);
     if ((await transaction.get(member)).exists) throw new HttpsError('already-exists', '이미 워크스페이스 멤버입니다.');
-    transaction.create(member, { uid: user.uid, email: user.email!.toLowerCase(), displayName: user.displayName?.trim().slice(0, 80) || user.email!.split('@')[0], role: 'member', joinedAt: FieldValue.serverTimestamp() });
+    transaction.create(member, { uid: user.uid, email: user.email!.toLowerCase(), displayName: user.displayName?.trim().slice(0, 80) || user.email!.split('@')[0], title: String(profile.get('title') || ''), bio: String(profile.get('bio') || ''), role: 'member', joinedAt: FieldValue.serverTimestamp() });
     transaction.create(db.doc(`users/${user.uid}/workspaces/${workspaceId}`), { workspaceId, name: workspace.get('name'), role: 'member', joinedAt: FieldValue.serverTimestamp() });
     transaction.update(invite, { status: 'accepted', acceptedBy: user.uid, acceptedAt: FieldValue.serverTimestamp() });
     return { workspaceId };

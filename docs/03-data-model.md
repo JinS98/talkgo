@@ -3,12 +3,12 @@
 > 8일차에 워크스페이스·초대·멤버십 경로와 읽기 권한을 구현했고, 12일차에 서버 전용 메시지 저장 필드를 구현했다. 17일차에 업무 생성 문서와 서버 검증을 구현했다. 로그인한 이메일 사용자의 최초 워크스페이스 생성 3문서 일괄 쓰기만 클라이언트에서 허용하고 나머지 쓰기는 차단한다.
 
 - `workspaces/{workspaceId}`: name, ownerId, createdAt. 클라이언트가 생성할 때 장 멤버십과 본인 목록 미러를 같은 일괄 쓰기로 생성해야 한다.
-- `users/{uid}`: displayName, setupComplete, createdAt, updatedAt. 첫 로그인 후 본인만 이름을 등록·수정한다.
-- `workspaces/{workspaceId}/members/{uid}`: uid, email, displayName, role(owner/member), joinedAt. 문서 ID를 Firebase UID로 고정하고 이름 변경 시 본인 멤버십에 반영한다. 기존 문서에 이름이 없으면 화면에는 UID 기반 임시 이름을 보여준다.
+- `users/{uid}`: displayName, title, bio, setupComplete, createdAt, updatedAt. 첫 로그인 후 본인만 이름을 등록하고 계정 메뉴에서 직책·소개를 수정한다.
+- `workspaces/{workspaceId}/members/{uid}`: uid, email, displayName, title, bio, role(owner/member), joinedAt. 문서 ID를 Firebase UID로 고정하고 본인의 이름·직책·소개 변경을 멤버십에 반영한다. 이 정보는 같은 워크스페이스 멤버의 프로필 패널에 표시된다. 기존 문서에 이름이 없으면 화면에는 UID 기반 임시 이름을 보여준다.
 - `users/{uid}/workspaces/{workspaceId}`: workspaceId, name, role, joinedAt. 본인의 워크스페이스 목록용 미러로 생성자 일괄 쓰기 또는 초대 수락 서버 트랜잭션에서 기록한다.
 - `workspaceInvites/{inviteId}`: workspaceId, invitedEmail, invitedBy, tokenHash, status(pending/accepted/revoked), createdAt, emailSentAt, expiresAt, acceptedBy, acceptedAt, revokedAt. 원본 토큰은 저장하지 않고 초대 문서는 클라이언트가 직접 읽지 못한다.
 - `channels/{channelId}`: workspaceId, name. 8일차 규칙은 워크스페이스 전체 공개 채널만 지원한다.
-- `dmRooms/{roomId}`: workspaceId, participantIds
+- `dmRooms/{roomId}`: workspaceId, participantIds, createdAt(새 방). `createDm` 함수가 두 사용자의 워크스페이스 멤버십을 확인하고 기존 1:1 방을 재사용하거나 결정적 ID의 방을 생성한다. 방과 메시지는 두 참여자만 읽을 수 있다.
 - `messages/{messageId}`: workspaceId, sourceType(channel/dm), channelId 또는 dmRoomId, senderId, clientMessageId, content, createdAt. 서버가 사용자 UID와 `clientMessageId`로 결정한 ID에 트랜잭션으로 한 번만 생성한다. `createdAt`은 소켓 서버가 생성한 Firestore Timestamp다. 같은 사용자의 클라이언트 ID는 룸과 워크스페이스를 통틀어 고유해야 한다.
 - `tasks/{taskId}`: workspaceId, sourceMessageId, sourceType(channel/dm), title, description, requesterId, createdById, assigneeId, dueDate, proposedDueDate, estimatedMinutes, status, reviewRequired, reviewWorkingDays, reviewCycle, reviewSubmittedAt, reviewRejectionReason, reviewDeadlineAt, completionReason, createdAt, updatedAt. 날짜 필드는 Firestore Timestamp이며, 미확정 값은 null이다. 기존 업무에는 `createdById`가 없을 수 있다. 타입 계약은 `shared/contracts/src/task.ts`에 둔다.
 - `taskEvents/{eventId}`: taskId, actorId, action, createdAt, metadata

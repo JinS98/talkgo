@@ -85,7 +85,7 @@ try {
   await oldSource.waitFor();
   assert.match(await oldSource.getAttribute('class'), /focusedMessage/);
   await ownerPage.waitForFunction(() => document.activeElement?.getAttribute('data-message-id') === 'links-channel-0');
-  await ownerPage.getByRole('button', { name: '링크 팀원' }).click();
+  await ownerPage.locator('section[aria-labelledby="dm-heading"]').getByRole('button', { name: '링크 팀원' }).click();
   const dmSource = ownerPage.getByRole('listitem').filter({ hasText: '비공개 원본' });
   await dmSource.hover();
   await dmSource.getByRole('button', { name: '업무 보기 · DM 후속 업무' }).click();

@@ -13,7 +13,7 @@ import styles from './AuthPage.module.scss';
 
 function SignedInApp({ auth, user, db, functions, onRefresh }: { auth: Auth; user: User; db: Firestore; functions: Functions; onRefresh: () => Promise<void> }) {
   const location = useLocation();
-  const { profile, error, saveName } = useUserProfile(db, user);
+  const { profile, error, saveName, saveDetails } = useUserProfile(db, user);
   const requestedNext = new URLSearchParams(location.search).get('next');
   const inviteNext = requestedNext && /^\/invite\/[A-Za-z0-9]+\?token=[A-Za-z0-9_-]+$/.test(requestedNext) ? requestedNext : null;
   const nextPath = inviteNext ?? '/workspace';
@@ -25,7 +25,7 @@ function SignedInApp({ auth, user, db, functions, onRefresh }: { auth: Auth; use
   return <Routes>
     <Route path="/login" element={<Navigate to={nextPath} replace />} />
     <Route path="/verify-email" element={<Navigate to={nextPath} replace />} />
-    <Route path="/workspace" element={<WorkspaceGate auth={auth} user={user} db={db} functions={functions} displayName={profile.displayName} onSaveName={saveName} onRefresh={onRefresh} />} />
+    <Route path="/workspace" element={<WorkspaceGate auth={auth} user={user} db={db} functions={functions} profile={profile} onSaveName={saveName} onSaveDetails={saveDetails} onRefresh={onRefresh} />} />
     <Route path="/invite/:inviteId" element={<InvitePage auth={auth} functions={functions} />} />
     <Route path="*" element={<Navigate to={nextPath} replace />} />
   </Routes>;

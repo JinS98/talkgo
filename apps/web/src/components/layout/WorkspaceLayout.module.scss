@@ -1,5 +1,9 @@
 ﻿.shell { display:grid; grid-template-columns:280px minmax(0,1fr); height:100vh; height:100dvh; overflow:hidden; }
 .skipLink { position:fixed; z-index:100; top:10px; left:10px; padding:9px 12px; border-radius:7px; background:var(--accent); color:#fff; font-weight:700; transform:translateY(-160%); }
+.profileOpen { grid-template-columns:280px minmax(0,1fr) 320px; }
+.profileSlot { display:flex; min-width:0; min-height:0; }
+.profileSlot > * { flex:1; }
+.profileBackdrop { display:none; }
 .skipLink:focus { transform:translateY(0); }
 .sidebar { display:flex; flex-direction:column; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:24px 14px 18px; border-right:1px solid var(--line); background:var(--sidebar); scrollbar-width:thin; scrollbar-color:#ccd2dd transparent; }
 .brandRow { flex:0 0 auto; }
@@ -27,6 +31,8 @@
 .conversationButton:focus-visible,.manageLink:focus-visible,.primaryButton:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .channelIcon { width:18px; color:#9aa3b2; font-size:17px; text-align:center; }
 .conversationButton.active .channelIcon { color:var(--accent); }
+.conversationGroups section { min-width:0; }
+.conversationGroups .sectionLabel span { margin-left:4px; color:#a1aaba; }
 .avatar { display:grid; flex:0 0 21px; place-items:center; height:21px; border-radius:7px; background:#e7ebf2; color:#58647a; font-size:10px; font-weight:800; }
 .manageLink { flex:0 0 auto; margin-top:16px; border-top:1px solid var(--line); border-radius:0 0 8px 8px; padding-top:14px; }
 .navIcon { display:grid; flex:0 0 21px; place-items:center; width:21px; height:21px; color:#8e98a7; }
@@ -42,6 +48,11 @@
 .main { display:flex; flex:1; flex-direction:column; width:100%; min-width:0; min-height:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; padding:30px 38px 42px; background:#fcfcfe; scrollbar-width:thin; scrollbar-color:#ccd2dd transparent; }
 .chatMain { overflow:hidden; padding:0; background:var(--surface); }
 @media (max-width:900px) { .shell { grid-template-columns:230px minmax(0,1fr); } .topbar { padding-inline:20px; } .main { padding-inline:20px; } }
+@media (min-width:901px) and (max-width:1200px) { .profileOpen { grid-template-columns:280px minmax(0,1fr); } }
+@media (max-width:1200px) {
+  .profileSlot { position:fixed; z-index:52; inset:0 0 0 auto; width:min(360px,100vw); box-shadow:-16px 0 40px #20283829; }
+  .profileBackdrop { display:block; position:fixed; z-index:51; inset:0; width:100%; border:0; background:#20283855; cursor:pointer; }
+}
 @media (max-width:650px) {
   .shell { display:flex; flex-direction:column; }
   .sidebar { display:grid; flex:0 0 auto; grid-template-columns:auto minmax(0,1fr); align-items:center; max-height:190px; gap:7px 12px; overflow-y:auto; padding:10px 14px; border-right:0; border-bottom:1px solid var(--line); }

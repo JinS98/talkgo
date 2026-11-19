@@ -1,0 +1,19 @@
+.panel { display:flex; flex-direction:column; min-width:0; min-height:0; border-left:1px solid var(--line); background:#fff; box-shadow:-8px 0 28px #2028380a; animation:slideIn .18s ease-out; }
+@keyframes slideIn { from { opacity:.6; transform:translateX(18px); } to { opacity:1; transform:translateX(0); } }
+.header { display:flex; align-items:center; justify-content:space-between; flex:0 0 65px; padding:0 22px; border-bottom:1px solid var(--line); }
+.header h2 { margin:0; font-size:14px; font-weight:800; }
+.header button { display:grid; place-items:center; width:30px; height:30px; border:0; border-radius:7px; background:transparent; color:#7b8796; cursor:pointer; font:inherit; font-size:22px; }
+.header button:hover { background:#f2f3f6; color:var(--ink); }
+.content { flex:1; min-height:0; overflow-y:auto; padding:28px 22px; }
+.avatar { display:grid; place-items:center; width:100%; aspect-ratio:1; max-height:250px; border-radius:10px; background:#e7e2ff; color:var(--accent); font-size:clamp(48px,7vw,78px); font-weight:750; }
+.content h3 { display:flex; align-items:center; gap:8px; margin:20px 0 4px; color:var(--ink); font-size:21px; letter-spacing:-.03em; }
+.content h3 span { padding:3px 6px; border-radius:5px; background:#f0f1f5; color:#7b8796; font-size:10px; letter-spacing:0; }
+.role { margin:0 0 22px; color:#687586; font-size:12px; }
+.messageButton { width:100%; min-height:38px; border:1px solid #d9d1fa; border-radius:8px; background:#f8f6ff; color:var(--accent); cursor:pointer; font:inherit; font-size:12px; font-weight:750; }
+.messageButton:hover { background:#eeeaff; }.messageButton:disabled { cursor:wait; opacity:.65; }
+.details { display:grid; gap:18px; margin-top:24px; padding-top:22px; border-top:1px solid var(--line); }
+.details strong { color:#748092; font-size:11px; }.details p { margin:6px 0 0; color:#364357; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+.bio { white-space:pre-wrap; }
+.error { padding:10px; border:1px solid #f1d5db; border-radius:7px; background:#fff2f4; color:#9c3e50; font-size:11px; }
+.header button:focus-visible,.messageButton:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media (prefers-reduced-motion:reduce) { .panel { animation:none; } }

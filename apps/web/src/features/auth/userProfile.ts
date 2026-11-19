@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { updateProfile, type User } from 'firebase/auth';
-import { collection, doc, getDocs, onSnapshot, runTransaction, serverTimestamp, updateDoc, type Firestore } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, runTransaction, serverTimestamp, updateDoc, writeBatch, type Firestore } from 'firebase/firestore';
 
 export interface UserProfile {
   displayName: string;
   setupComplete: boolean;
+  title: string;
+  bio: string;
 }
 
 function initialName(authName: string | null): string {
@@ -21,7 +23,7 @@ export function useUserProfile(db: Firestore, user: User) {
     return onSnapshot(profileRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        setProfile({ displayName: String(data.displayName || ''), setupComplete: data.setupComplete === true });
+        setProfile({ displayName: String(data.displayName || ''), setupComplete: data.setupComplete === true, title: String(data.title || ''), bio: String(data.bio || '') });
         setError('');
       } else if (!initializing) {
         initializing = true;
@@ -42,5 +44,16 @@ export function useUserProfile(db: Firestore, user: User) {
     await updateDoc(doc(db, 'users', user.uid), { displayName, setupComplete: true, updatedAt: serverTimestamp() });
   }
 
-  return { profile, error, saveName };
+  async function saveDetails(value: Pick<UserProfile, 'title' | 'bio'>) {
+    const title = value.title.trim();
+    const bio = value.bio.trim();
+    if (title.length > 60 || bio.length > 240) throw new Error('직책은 60자, 소개는 240자 이내로 입력해 주세요.');
+    const memberships = await getDocs(collection(db, 'users', user.uid, 'workspaces'));
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'users', user.uid), { title, bio, updatedAt: serverTimestamp() });
+    for (const item of memberships.docs) batch.update(doc(db, 'workspaces', item.id, 'members', user.uid), { title, bio });
+    await batch.commit();
+  }
+
+  return { profile, error, saveName, saveDetails };
 }

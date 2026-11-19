@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, onSnapshot, query, where, type Firestore } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, type Firestore, type Timestamp } from 'firebase/firestore';
 import { defaultChannelId, type DemoChannel, type DemoDirectMessage } from './demoConversations';
 
 interface ScopedItems<T> { workspaceId: string; items: T[] }
 interface DmRoom { id: string; participantIds: string[] }
+export interface WorkspaceMember { uid: string; email: string; displayName: string; role: 'owner' | 'member'; title: string; bio: string; joinedAt?: Timestamp }
 
 export function useWorkspaceConversations(db?: Firestore, workspaceId?: string, viewerId?: string) {
   const [channels, setChannels] = useState<ScopedItems<DemoChannel>>({ workspaceId: '', items: [] });
   const [rooms, setRooms] = useState<ScopedItems<DmRoom>>({ workspaceId: '', items: [] });
-  const [members, setMembers] = useState<{ workspaceId: string; emails: Record<string, string>; names: Record<string, string> }>({ workspaceId: '', emails: {}, names: {} });
+  const [members, setMembers] = useState<{ workspaceId: string; items: WorkspaceMember[] }>({ workspaceId: '', items: [] });
   const [errors, setErrors] = useState<Record<'channels' | 'rooms' | 'members', string>>({ channels: '', rooms: '', members: '' });
 
   useEffect(() => {
@@ -24,8 +25,7 @@ export function useWorkspaceConversations(db?: Firestore, workspaceId?: string, 
     const stopMembers = onSnapshot(collection(db, 'workspaces', workspaceId, 'members'), (snapshot) => {
       setMembers({
         workspaceId,
-        emails: Object.fromEntries(snapshot.docs.map((item) => [item.id, String(item.get('email') || item.id)])),
-        names: Object.fromEntries(snapshot.docs.map((item) => [item.id, String(item.get('displayName') || `팀원-${item.id.slice(0, 4).toUpperCase()}`)])),
+        items: snapshot.docs.map((item) => ({ uid: item.id, email: String(item.get('email') || ''), displayName: String(item.get('displayName') || `팀원-${item.id.slice(0, 4).toUpperCase()}`), role: item.get('role') === 'owner' ? 'owner' : 'member', title: String(item.get('title') || ''), bio: String(item.get('bio') || ''), joinedAt: item.get('joinedAt') as Timestamp | undefined })),
       });
       setErrors((current) => ({ ...current, members: '' }));
     }, () => setErrors((current) => ({ ...current, members: '멤버 목록을 불러오지 못했습니다.' })));
@@ -41,13 +41,14 @@ export function useWorkspaceConversations(db?: Firestore, workspaceId?: string, 
 
   const directMessages = useMemo(() => {
     if (!workspaceId || rooms.workspaceId !== workspaceId) return [];
-    const names = members.workspaceId === workspaceId ? members.names : {};
+    const names = Object.fromEntries((members.workspaceId === workspaceId ? members.items : []).map((member) => [member.uid, member.displayName]));
     return rooms.items.map((room): DemoDirectMessage => {
       const otherId = room.participantIds.find((id) => id !== viewerId) ?? viewerId ?? '';
       const name = names[otherId] ?? `팀원-${otherId.slice(0, 4).toUpperCase()}`;
-      return { id: room.id, name, initials: name.charAt(0).toUpperCase() };
+      return { id: room.id, name, initials: name.charAt(0).toUpperCase(), participantIds: room.participantIds };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [members, rooms, viewerId, workspaceId]);
 
-  return { channels: availableChannels, directMessages, memberEmails: members.workspaceId === workspaceId ? members.emails : {}, memberNames: members.workspaceId === workspaceId ? members.names : {}, error: Object.values(errors).filter(Boolean).join(' ') };
+  const visibleMembers = members.workspaceId === workspaceId ? members.items : [];
+  return { channels: availableChannels, directMessages, members: visibleMembers, memberEmails: Object.fromEntries(visibleMembers.map((member) => [member.uid, member.email])), memberNames: Object.fromEntries(visibleMembers.map((member) => [member.uid, member.displayName])), error: Object.values(errors).filter(Boolean).join(' ') };
 }

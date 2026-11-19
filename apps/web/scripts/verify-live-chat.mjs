@@ -344,8 +344,8 @@ try {
   await ownerPage.goto(`${origin}/workspace`);
   await visibleOnce(ownerPage, 'message while owner away');
 
-  await ownerPage.getByRole('button', { name: member.displayName }).click();
-  await memberPage.getByRole('button', { name: owner.displayName }).click();
+  await ownerPage.locator('section[aria-labelledby="dm-heading"]').getByRole('button', { name: member.displayName }).click();
+  await memberPage.locator('section[aria-labelledby="dm-heading"]').getByRole('button', { name: owner.displayName }).click();
   await visibleOnce(ownerPage, 'earlier direct message');
   await visibleOnce(memberPage, 'earlier direct message');
   await ownerPage.getByRole('listitem').filter({ hasText: 'earlier direct message' }).getByRole('button', { name: '업무 요청' }).click();
@@ -462,7 +462,7 @@ try {
   await send(memberPage, 'member direct reply');
   await visibleOnce(memberPage, 'member direct reply');
   assert.equal(await ownerPage.getByText('member direct reply', { exact: true }).count(), 0, 'DM leaked into channel view.');
-  await ownerPage.getByRole('button', { name: member.displayName }).click();
+  await ownerPage.locator('section[aria-labelledby="dm-heading"]').getByRole('button', { name: member.displayName }).click();
   await visibleOnce(ownerPage, 'owner direct message');
   await ownerPage.getByText('실시간 연결됨').waitFor();
   await ownerPage.reload();

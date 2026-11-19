@@ -9,6 +9,7 @@ export interface DemoDirectMessage {
   id: DmRoomId;
   name: string;
   initials: string;
+  participantIds?: string[];
 }
 
 export type ConversationSelection =

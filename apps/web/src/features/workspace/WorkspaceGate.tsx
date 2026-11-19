@@ -5,6 +5,7 @@ import type { Functions } from 'firebase/functions';
 import { useNavigate, useSearchParams } from 'react-router';
 import App from '../../App';
 import { AccountMenu } from '../auth/AccountMenu';
+import type { UserProfile } from '../auth/userProfile';
 import { useWorkspaceNavigationStore } from '../../store/useWorkspaceNavigationStore';
 import { callWorkspace, createWorkspace, workspaceCreationError, workspaceError } from './workspaceApi';
 import styles from './WorkspaceGate.module.scss';
@@ -17,7 +18,8 @@ function PickerMark() {
   return <svg className={styles.pickerMark} aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 7.5 5 5 5-5" /></svg>;
 }
 
-export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveName, onRefresh }: { auth: Auth; user: User; db: Firestore; functions: Functions; displayName: string; onSaveName: (name: string) => Promise<void>; onRefresh: () => Promise<void> }) {
+export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, onSaveDetails, onRefresh }: { auth: Auth; user: User; db: Firestore; functions: Functions; profile: UserProfile; onSaveName: (name: string) => Promise<void>; onSaveDetails: (details: Pick<UserProfile, 'title' | 'bio'>) => Promise<void>; onRefresh: () => Promise<void> }) {
+  const displayName = profile.displayName;
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const selectedWorkspaceIdRef = useRef('');
@@ -98,7 +100,7 @@ export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveNa
     if (createPending) return;
     setCreatePending(true); setError('');
     try {
-      const result = await createWorkspace(auth, db, name);
+      const result = await createWorkspace(auth, db, name, profile);
       setCreatedWorkspaceId(result.workspaceId);
       setParams({ workspaceId: result.workspaceId });
       setInvitesWorkspaceId('');
@@ -206,7 +208,7 @@ export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveNa
             <p className={styles.waitingHint}>아직 초대 메일이 없다면 이 화면에서 기다려도 됩니다. 워크스페이스를 만들 필요는 없습니다.</p>
           </section>
         </div>
-        <div className={styles.emptyAccount}><AccountMenu auth={auth} user={user} displayName={displayName} onSaveName={onSaveName} onRefresh={onRefresh} /></div>
+        <div className={styles.emptyAccount}><AccountMenu auth={auth} user={user} displayName={displayName} profile={profile} onSaveName={onSaveName} onSaveDetails={onSaveDetails} onRefresh={onRefresh} /></div>
       </div>
     </main>
   );
@@ -227,7 +229,7 @@ export function WorkspaceGate({ auth, user, db, functions, displayName, onSaveNa
             </button>)}
           </div>}
         </div>
-      } accountControls={<AccountMenu auth={auth} user={user} displayName={displayName} onSaveName={onSaveName} onRefresh={onRefresh} />} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
+      } accountControls={<AccountMenu auth={auth} user={user} displayName={displayName} profile={profile} onSaveName={onSaveName} onSaveDetails={onSaveDetails} onRefresh={onRefresh} />} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
         <div className={styles.managementHeading}><p className={styles.eyebrow}>WORKSPACE</p><h1>{selected.name} 관리</h1><p>멤버와 초대 현황을 확인하고 새 멤버를 초대하세요.</p></div>
         <div className={styles.managementGrid}>
           <section className={styles.managementCard} aria-labelledby="invite-title"><div className={styles.cardHeading}><h2 id="invite-title">멤버 초대</h2></div><p className={styles.helper}>이메일 주소로 초대 링크를 보냅니다. 상대방은 같은 주소로 로그인해 수락할 수 있습니다.</p>

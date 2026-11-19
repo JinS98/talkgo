@@ -34,10 +34,12 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
       allow update: if signedIn() && request.auth.uid == userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'setupComplete', 'updatedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'title', 'bio', 'setupComplete', 'updatedAt'])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() >= 2
         && request.resource.data.displayName.size() <= 40
+        && (!('title' in request.resource.data) || (request.resource.data.title is string && request.resource.data.title.size() <= 60))
+        && (!('bio' in request.resource.data) || (request.resource.data.bio is string && request.resource.data.bio.size() <= 240))
         && request.resource.data.setupComplete == true
         && request.resource.data.updatedAt == request.time;
     }
@@ -73,18 +75,22 @@ service cloud.firestore {
         allow create: if eligibleCreator() && memberId == request.auth.uid
           && !exists(/databases/$(database)/documents/workspaces/$(workspaceId))
           && request.resource.data.keys().hasAll(['uid', 'email', 'role', 'joinedAt'])
-          && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'joinedAt'])
+          && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'title', 'bio', 'role', 'joinedAt'])
           && (!('displayName' in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() >= 1 && request.resource.data.displayName.size() <= 80))
+          && (!('title' in request.resource.data) || (request.resource.data.title is string && request.resource.data.title.size() <= 60))
+          && (!('bio' in request.resource.data) || (request.resource.data.bio is string && request.resource.data.bio.size() <= 240))
           && request.resource.data.uid == memberId
           && request.resource.data.email == request.auth.token.email
           && request.resource.data.role == 'owner'
           && request.resource.data.joinedAt == request.time
           && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerId == memberId;
         allow update: if signedIn() && memberId == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'title', 'bio'])
           && request.resource.data.displayName is string
           && request.resource.data.displayName.size() >= 2
-          && request.resource.data.displayName.size() <= 40;
+          && request.resource.data.displayName.size() <= 40
+          && (!('title' in request.resource.data) || (request.resource.data.title is string && request.resource.data.title.size() <= 60))
+          && (!('bio' in request.resource.data) || (request.resource.data.bio is string && request.resource.data.bio.size() <= 240));
         allow delete: if false;
       }
     }
