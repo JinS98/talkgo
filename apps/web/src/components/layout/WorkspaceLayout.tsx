@@ -71,28 +71,8 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
       </a>
 
       <aside className={styles.sidebar} aria-label="워크스페이스 영역">
-        <div className={styles.brandRow}>
-          <div className={styles.brand}>
-            <span className={styles.brandMark} aria-hidden="true">
-              t<span>:</span>go
-            </span>
-            <span className={styles.brandName}>TASKGO</span>
-          </div>
-          <span className={styles.mobileStatus}>{workspaceName ?? '샘플 워크스페이스'}</span>
-        </div>
-
-        <div className={styles.workspaceSection}>
-          {workspaceControls ?? <div className={styles.workspaceCard}>
-            <span className={styles.workspaceIcon} aria-hidden="true">T</span>
-            <div>
-              <strong>{workspaceName ?? 'Taskgo 데모 팀'}</strong>
-              <span>{canManageWorkspace ? '워크스페이스 장' : workspaceName ? '멤버' : '샘플 데이터'}</span>
-            </div>
-          </div>}
-        </div>
-
         <nav className={styles.primaryNav} aria-label="화면 전환">
-          <h2 className={styles.sectionLabel}>화면</h2>
+          <span className={styles.railBrand} aria-label="Taskgo">t<span>:</span>go</span>
           <ul className={styles.primaryList}>
             {primaryViews.map(({ id, label }) => <li key={id}>
               <button className={`${styles.primaryButton} ${activeView === id ? styles.active : ''}`} type="button" aria-pressed={activeView === id} onClick={() => setView(id)}>
@@ -100,64 +80,78 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
               </button>
             </li>)}
           </ul>
+          {canManageWorkspace && <button className={`${styles.manageLink} ${activeView === 'workspace' ? styles.active : ''}`} type="button" aria-pressed={activeView === 'workspace'} onClick={() => setView('workspace')}><NavigationIcon view="workspace" /><span>워크스페이스 관리</span></button>}
         </nav>
 
-        <div className={styles.conversationGroups}>
-          <section aria-labelledby="channels-heading">
-            <h2 id="channels-heading" className={styles.sectionLabel}>채널</h2>
-            <ul className={styles.conversationList}>
-              {visibleChannels.map(({ id, name }) => (
-                <li key={id}>
-                  <button
-                    className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id ? styles.active : ''}`}
-                    type="button"
-                    aria-pressed={activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id}
-                    onClick={() => selectConversation(liveChat ? { kind: 'channel', id, name } : { kind: 'channel', id })}
-                  >
-                    <span className={styles.channelIcon} aria-hidden="true">#</span>
-                    <span>{name}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+        <div className={styles.sidebarBody}>
+          <div className={styles.brandRow}>
+            <span className={styles.brandName}>TASKGO</span>
+            <strong className={styles.sidebarTitle}>대화</strong>
+          </div>
 
-          <section aria-labelledby="dm-heading">
-            <h2 id="dm-heading" className={styles.sectionLabel}>DM</h2>
-            <ul className={styles.conversationList}>
-              {visibleDirectMessages.map(({ id, name, initials }) => (
-                <li key={id}>
-                  <button
-                    className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id ? styles.active : ''}`}
-                    type="button"
-                    aria-pressed={activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id}
-                    onClick={() => selectConversation(liveChat ? { kind: 'dm', id, name } : { kind: 'dm', id })}
-                  >
-                    <span className={styles.avatar} aria-hidden="true">{initials}</span>
-                    <span>{name}</span>
+          <div className={styles.workspaceSection}>
+            {workspaceControls ?? <div className={styles.workspaceCard}>
+              <span className={styles.workspaceIcon} aria-hidden="true">T</span>
+              <div>
+                <strong>{workspaceName ?? 'Taskgo 데모 팀'}</strong>
+                <span>{canManageWorkspace ? '워크스페이스 장' : workspaceName ? '멤버' : '샘플 데이터'}</span>
+              </div>
+            </div>}
+          </div>
+
+          <div className={styles.conversationGroups}>
+            <section aria-labelledby="channels-heading">
+              <h2 id="channels-heading" className={styles.sectionLabel}>채널</h2>
+              <ul className={styles.conversationList}>
+                {visibleChannels.map(({ id, name }) => (
+                  <li key={id}>
+                    <button
+                      className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id ? styles.active : ''}`}
+                      type="button"
+                      aria-pressed={activeView === 'chat' && selectedConversation.kind === 'channel' && selectedConversation.id === id}
+                      onClick={() => selectConversation(liveChat ? { kind: 'channel', id, name } : { kind: 'channel', id })}
+                    >
+                      <span className={styles.channelIcon} aria-hidden="true">#</span>
+                      <span>{name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section aria-labelledby="dm-heading">
+              <h2 id="dm-heading" className={styles.sectionLabel}>DM</h2>
+              <ul className={styles.conversationList}>
+                {visibleDirectMessages.map(({ id, name, initials }) => (
+                  <li key={id}>
+                    <button
+                      className={`${styles.conversationButton} ${activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id ? styles.active : ''}`}
+                      type="button"
+                      aria-pressed={activeView === 'chat' && selectedConversation.kind === 'dm' && selectedConversation.id === id}
+                      onClick={() => selectConversation(liveChat ? { kind: 'dm', id, name } : { kind: 'dm', id })}
+                    >
+                      <span className={styles.avatar} aria-hidden="true">{initials}</span>
+                      <span>{name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {liveChat && visibleDirectMessages.length === 0 && <p className={styles.emptyNote}>아직 DM이 없습니다.</p>}
+            </section>
+            {liveChat && <section aria-labelledby="members-heading">
+              <h2 id="members-heading" className={styles.sectionLabel}>멤버 <span>{members.length}</span></h2>
+              <ul className={styles.conversationList}>
+                {members.map((member) => <li key={member.uid}>
+                  <button className={styles.conversationButton} type="button" onClick={() => onOpenProfile?.(member.uid)}>
+                    <span className={styles.avatar} aria-hidden="true">{member.displayName.charAt(0).toUpperCase()}</span>
+                    <span>{member.displayName}{member.uid === viewerId && ' (나)'}</span>
                   </button>
-                </li>
-              ))}
-            </ul>
-            {liveChat && visibleDirectMessages.length === 0 && <p className={styles.sectionLabel}>아직 DM이 없습니다.</p>}
-          </section>
-          {liveChat && <section aria-labelledby="members-heading">
-            <h2 id="members-heading" className={styles.sectionLabel}>멤버 <span>{members.length}</span></h2>
-            <ul className={styles.conversationList}>
-              {members.map((member) => <li key={member.uid}>
-                <button className={styles.conversationButton} type="button" onClick={() => onOpenProfile?.(member.uid)}>
-                  <span className={styles.avatar} aria-hidden="true">{member.displayName.charAt(0).toUpperCase()}</span>
-                  <span>{member.displayName}{member.uid === viewerId && ' (나)'}</span>
-                </button>
-              </li>)}
-            </ul>
-          </section>}
-          {conversationError && <p role="alert" className={styles.sectionLabel}>{conversationError}</p>}
+                </li>)}
+              </ul>
+            </section>}
+            {conversationError && <p role="alert" className={styles.sectionLabel}>{conversationError}</p>}
+          </div>
         </div>
-
-        {canManageWorkspace && <button className={`${styles.manageLink} ${activeView === 'workspace' ? styles.active : ''}`} type="button" aria-pressed={activeView === 'workspace'} onClick={() => setView('workspace')}><NavigationIcon view="workspace" /><span>워크스페이스 관리</span></button>}
-
-        <p className={styles.sidebarFooter}>대화가 업무가 되는 순간</p>
       </aside>
 
       <div className={styles.mainColumn}>
