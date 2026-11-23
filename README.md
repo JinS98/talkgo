@@ -4,7 +4,13 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 34일차 운영 배포 완료.** 웹은 [Firebase Hosting](https://taskgo-jins98.web.app), 실시간 채팅 서버는 Cloud Run, 데이터와 서버 함수는 Firebase 운영 프로젝트에 배포했습니다. 로그인·워크스페이스·채팅·업무 보드·캘린더 기능을 제공합니다. 초대 메일과 AI 초안은 외부 서비스 설정이 완료될 때까지 사용할 수 없습니다. 배포 검증과 남은 설정은 [34일차 기록](docs/daily/day-34.md)을 참고하세요.
+> **현재 상태: 35일차 운영 검증 완료.** 웹은 [Firebase Hosting](https://taskgo-jins98.web.app), 실시간 채팅 서버는 Cloud Run, 데이터와 서버 함수는 Firebase 운영 프로젝트에 배포했습니다. 임시 계정 2개로 채널·DM 채팅, 업무 요청·수락, 캘린더 반영을 확인했습니다. 초대 메일과 AI 초안은 외부 서비스 설정이 완료될 때까지 사용할 수 없습니다. 자세한 화면과 검증 결과는 [프로젝트 포트폴리오](docs/10-portfolio.md)를 참고하세요.
+
+## 운영 데모
+
+- 웹: https://taskgo-jins98.web.app
+- [기능·화면·검증 포트폴리오](docs/10-portfolio.md)
+- [배포와 비용 설정](docs/07-cost-deployment.md) · [35일차 최종 검증 기록](docs/daily/day-35.md)
 
 ## 기술 구성
 - Web: React + TypeScript + Vite + SCSS Modules + Zustand
@@ -127,6 +133,7 @@ npm run test:workspace
 - [업무·검수 정책](docs/05-task-review-policy.md)
 - [보안·테스트](docs/06-security-testing.md)
 - [비용·배포](docs/07-cost-deployment.md)
+- [프로젝트 포트폴리오](docs/10-portfolio.md)
 
 기획 원본: https://app.notion.com/p/356c883fa20281eba227cc40d438a92f
 
