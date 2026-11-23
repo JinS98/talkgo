@@ -14,6 +14,7 @@
     "dev:web": "npm run dev -w @taskgo/web",
     "dev:web:emulator": "npm run dev:emulator -w @taskgo/web",
     "build:web": "npm run build -w @taskgo/web",
+    "build:prod:web": "node scripts/build-production-web.mjs",
     "build:functions": "npm run build -w @taskgo/functions",
     "prepare:emulator": "node functions/scripts/prepare-emulator.mjs",
     "typecheck": "npm run typecheck -w @taskgo/web && npm run typecheck -w @taskgo/socket-server && npm run typecheck -w @taskgo/functions",

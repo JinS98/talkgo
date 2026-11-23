@@ -1,0 +1,13 @@
+.git
+node_modules
+**/node_modules
+**/dist
+**/lib
+**/.env*
+**/.secret*
+.taskgo-emulator-data
+.firebase
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+*.tsbuildinfo

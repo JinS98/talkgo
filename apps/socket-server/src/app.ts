@@ -52,7 +52,7 @@ function connectionError(code: string, message: string): Error {
 export function createSocketApp({ allowedOrigins, services }: SocketAppOptions) {
   const origins = new Set(allowedOrigins);
   const httpServer = createServer((request, response) => {
-    if (request.method === 'GET' && request.url === '/healthz') {
+    if (request.method === 'GET' && (request.url === '/healthz' || request.url === '/status')) {
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       response.end(JSON.stringify({ status: 'ok', protocolVersion }));
       return;

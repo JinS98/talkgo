@@ -4,11 +4,11 @@
 
 채팅을 업무로 전환하고 팀 전체의 업무·검수·캘린더를 공유하는 Slack 스타일 협업툴.
 
-> **현재 상태: 28일차 팀 캘린더 구현(로컬 에뮬레이터 기준).** 채널·DM 메시지에서 업무를 요청하고, 담당자가 수락·진행 시작·마감 변경을 제안할 수 있습니다. 검수 대상 업무는 제출→요청자 승인 또는 사유 있는 반려→재제출 흐름을 지원하며, 기한이 지나면 자동 완료됩니다. 제출·잔여 8/2근무시간·완료 알림은 헤더의 알림 센터에 표시됩니다. 검수 없는 업무는 담당자가 완료합니다. FullCalendar에서 업무·검수·회의 일정을 실시간으로 확인하고 워크스페이스 멤버가 회의를 등록할 수 있습니다. 초대 메일의 실제 발송과 Functions·예약 작업 배포는 SMTP·Blaze 설정 전입니다.
+> **현재 상태: 34일차 운영 배포 완료.** 웹은 [Firebase Hosting](https://taskgo-jins98.web.app), 실시간 채팅 서버는 Cloud Run, 데이터와 서버 함수는 Firebase 운영 프로젝트에 배포했습니다. 로그인·워크스페이스·채팅·업무 보드·캘린더 기능을 제공합니다. 초대 메일과 AI 초안은 외부 서비스 설정이 완료될 때까지 사용할 수 없습니다. 배포 검증과 남은 설정은 [34일차 기록](docs/daily/day-34.md)을 참고하세요.
 
 ## 기술 구성
 - Web: React + TypeScript + Vite + SCSS Modules + Zustand
-- 실시간 채팅: Node.js + Socket.io (Cloud Run 예정)
+- 실시간 채팅: Node.js + Socket.io (Cloud Run 배포)
 - 인증/DB: Firebase Auth + Cloud Firestore
 - 서버 로직: Cloud Functions (워크스페이스·초대·업무 생성·요청 응답·검수 기한 예약 작업)
 - 개발: Firebase Emulator Suite, 로컬 Socket.io
@@ -53,13 +53,13 @@ Auth·Firestore 에뮬레이터를 실행한 뒤 `npm run dev:socket:emulator`�
 
 `npm run test:review-deadline`은 에뮬레이터 없이 서울 근무시간·공휴일·대체공휴일을 적용한 검수 기한 계산을 확인합니다. 공식 임시공휴일이나 선거일이 새로 지정되면 [검수 정책](docs/05-task-review-policy.md)의 공휴일 데이터를 갱신해야 합니다.
 
-`npm run test:review-timeout`은 Firestore 에뮬레이터에서 기한 초과·중복 실행·검수 회차·승인/반려 경합을 확인합니다. 기본 에뮬레이터 포트를 사용하므로 `dev:all`을 종료한 뒤 실행하세요. `npm run dev:all`에는 검수 기한 자동 완료 반복 실행기가 포함되며 약 1분마다 기한을 확인합니다. 배포 환경의 `completeExpiredReviews` 예약 함수도 1분마다 실행됩니다. Cloud Scheduler를 사용하려면 Firebase 프로젝트의 요금제와 함수 배포 설정이 필요합니다. 실제 프로젝트에는 아직 배포하지 않았습니다.
+`npm run test:review-timeout`은 Firestore 에뮬레이터에서 기한 초과·중복 실행·검수 회차·승인/반려 경합을 확인합니다. 기본 에뮬레이터 포트를 사용하므로 `dev:all`을 종료한 뒤 실행하세요. `npm run dev:all`에는 검수 기한 자동 완료 반복 실행기가 포함되며 약 1분마다 기한을 확인합니다. 운영 환경의 `completeExpiredReviews` 예약 함수도 1분마다 실행됩니다.
 
 `npm run test:review-notifications`는 제출·8/2근무시간 리마인드·완료 알림, 중복 방지와 본인 읽기 권한을 Firestore 에뮬레이터에서 확인합니다. 알림은 앱 내부에만 기록되며 이메일이나 브라우저 푸시는 보내지 않습니다. 헤더의 **알림** 버튼에서 최근 50개를 보고 선택하면 읽음 처리 후 업무 보드로 이동합니다.
 
 ## Firebase 개발 환경
 
-실제 Firebase 프로젝트는 `taskgo-jins98`, 웹 앱은 `taskgo-web`입니다. 이메일·비밀번호와 Google 로그인 공급자를 활성화했고, Cloud Firestore 기본 데이터베이스는 서울(`asia-northeast3`)에 생성했습니다. [Firestore 규칙](firestore.rules)은 로그인한 이메일 사용자의 워크스페이스·장 멤버십·본인 목록을 일괄 생성할 때만 클라이언트 쓰기를 허용합니다. 초대·채팅·업무 쓰기는 계속 차단합니다. 실제 프로젝트에는 변경된 규칙을 별도로 배포해야 하며 초대용 Functions는 아직 배포하지 않았습니다.
+실제 Firebase 프로젝트는 `taskgo-jins98`, 웹 앱은 `taskgo-web`입니다. 이메일·비밀번호와 Google 로그인 공급자를 활성화했고, Cloud Firestore 기본 데이터베이스는 서울(`asia-northeast3`)에 생성했습니다. [Firestore 규칙](firestore.rules)은 로그인한 이메일 사용자의 워크스페이스·장 멤버십·본인 목록을 일괄 생성할 때만 클라이언트 쓰기를 허용합니다. 초대·채팅·업무 쓰기는 계속 차단합니다. 운영 프로젝트에 규칙·인덱스와 Functions를 배포했습니다. 초대 함수는 SMTP 설정이 완료될 때까지 발송하지 않습니다.
 
 로컬 에뮬레이터는 Java 21이 필요합니다. 터미널 두 개에서 실행합니다.
 
@@ -72,7 +72,7 @@ npm run dev:web:emulator
 
 로그인한 계정의 **계정** 메뉴에서 표시 이름·직책·소개를 수정할 수 있습니다. 사이드바의 멤버 또는 채팅 작성자를 누르면 오른쪽 프로필에서 이름·직책·소개·이메일·참여일을 확인할 수 있습니다. 채팅·DM·업무의 이름 표시는 워크스페이스 멤버 이름과 함께 갱신됩니다. 이메일 계정에는 Google 로그인을 연결할 수 있습니다. 이미 다른 계정에 연결된 로그인 방식은 자동 병합하지 않고 오류를 표시합니다.
 
-실제 프로젝트 설정으로 `npm run dev:web`을 실행할 때는 변경된 Firestore 규칙을 배포해야 이름 등록과 새 이메일 계정의 워크스페이스 만들기가 동작합니다. 초대 메일 보내기는 Functions와 SMTP 설정 전까지 사용할 수 없으며, 워크스페이스를 만든 직후 자동으로 초대가 발송되지는 않습니다.
+실제 프로젝트 설정으로 `npm run dev:web`을 실행하면 운영 Firestore 규칙을 사용합니다. 초대 메일 보내기는 SMTP 설정 전까지 사용할 수 없으며, 워크스페이스를 만든 직후 자동으로 초대가 발송되지는 않습니다.
 
 실제 프로젝트 웹 설정은 [환경 변수 예시](apps/web/.env.example)를 `apps/web/.env.local`로 복사해 입력합니다. 이 PC에는 웹 앱 설정이 입력되어 있습니다. `VITE_USE_FIREBASE_EMULATORS=false`일 때만 실제 프로젝트를 사용하며 `.env.local`은 Git에서 제외됩니다.
 

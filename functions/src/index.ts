@@ -61,7 +61,7 @@ export const markNotificationRead = onCall({ region }, async (request) => {
 
 export const suggestTask = onCall({ region, secrets: [taskAiKey], timeoutSeconds: 30 }, async (request) => {
   const user = await activeUser(request);
-  const apiKey = taskAiKey.value();
+  const apiKey = taskAiKey.value()?.trim();
   if (process.env.FUNCTIONS_EMULATOR === 'true' && (process.env.TASKGO_AI_MOCK === '1' || !apiKey || apiKey === 'local-disabled')) {
     return suggestTaskFromMessage(db, user.uid, request.data, localTaskCandidates, true);
   }
@@ -108,6 +108,9 @@ export const inviteMember = onCall({ region, secrets: [smtpUrl] }, async (reques
   }
   const workspace = await ownerWorkspace(workspaceId, user.uid);
   if (user.email!.toLowerCase() === invitedEmail) throw new HttpsError('already-exists', '본인은 이미 워크스페이스 멤버입니다.');
+  if (process.env.FUNCTIONS_EMULATOR !== 'true' && (smtpUrl.value()?.trim() === 'not-configured' || !process.env.INVITE_FROM)) {
+    throw new HttpsError('failed-precondition', '초대 메일 SMTP 설정이 없습니다.');
+  }
   try {
     const existing = await getAuth().getUserByEmail(invitedEmail);
     if ((await workspace.ref.collection('members').doc(existing.uid).get()).exists) {
