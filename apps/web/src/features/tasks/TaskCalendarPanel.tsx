@@ -14,6 +14,7 @@ import { httpsCallable, type Functions } from 'firebase/functions';
 import type { WorkspaceTaskState } from './useWorkspaceTasks';
 import { buildCalendarEvents, canProposeCalendarDue, koreanDateKey, shiftedCalendarDueDate, type CalendarFilter } from './calendarEvents';
 import { respondTask, taskResponseError } from './taskResponseApi';
+import { useModalDialog } from '../../hooks/useModalDialog';
 import styles from './TaskCalendarPanel.module.scss';
 
 type MeetingRecord = { id: string; title: string; startsAt: Timestamp; endsAt: Timestamp };
@@ -39,8 +40,6 @@ function eventTitle(info: MountInfo<EventDisplayInfo>) {
 
 export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId, taskState }: { auth: Auth; db: Firestore; functions: Functions; workspaceId: string; viewerId: string; taskState: WorkspaceTaskState }) {
   const calendarRef = useRef<CalendarRef>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const proposalDialogRef = useRef<HTMLDialogElement>(null);
   const [month, setMonth] = useState(() => koreanDateKey(new Date()).slice(0, 7));
   const [filter, setFilter] = useState<CalendarFilter>('team');
   const [meetings, setMeetings] = useState<MeetingRecord[]>([]);
@@ -58,6 +57,8 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId, 
   const [respondingTaskIds, setRespondingTaskIds] = useState<Set<string>>(() => new Set());
   const [responseError, setResponseError] = useState<{ taskId: string; message: string } | null>(null);
   const [actionNotice, setActionNotice] = useState('');
+  const dialogRef = useModalDialog(meetingOpen);
+  const proposalDialogRef = useModalDialog(Boolean(dueProposal));
 
   const { tasks, loading: tasksLoading, error: taskLoadError } = taskState;
   useEffect(() => onSnapshot(query(collection(db, 'meetings'), where('workspaceId', '==', workspaceId)), snapshot => {
@@ -65,18 +66,6 @@ export function TaskCalendarPanel({ auth, db, functions, workspaceId, viewerId, 
     setMeetingsLoaded(true);
     setMeetingLoadError('');
   }, () => { setMeetingsLoaded(true); setMeetingLoadError('회의 일정을 불러오지 못했습니다. 연결 상태를 확인해 주세요.'); }), [db, workspaceId]);
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (meetingOpen && dialog && !dialog.open) dialog.showModal();
-    if (!meetingOpen && dialog?.open) dialog.close();
-    return () => { if (dialog?.open) dialog.close(); };
-  }, [meetingOpen]);
-  useEffect(() => {
-    const dialog = proposalDialogRef.current;
-    if (dueProposal && dialog && !dialog.open) dialog.showModal();
-    if (!dueProposal && dialog?.open) dialog.close();
-    return () => { if (dialog?.open) dialog.close(); };
-  }, [dueProposal]);
 
   const events = useMemo(() => buildCalendarEvents(tasks.filter(task => task.createdAt instanceof Timestamp && task.dueDate instanceof Timestamp).map(task => ({
     id: task.id, title: task.title, status: task.status, assigneeId: task.assigneeId, requesterId: task.requesterId,

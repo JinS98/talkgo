@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChatComposer } from './ChatComposer';
 import { getIdToken, type Auth } from 'firebase/auth';
 import type { Functions } from 'firebase/functions';
 import { io, type Socket } from 'socket.io-client';
@@ -245,18 +246,6 @@ export function LiveChatPanel({ auth, functions, conversation, workspaceId, view
     void send(message);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    sendDraft();
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      sendDraft();
-    }
-  }
-
   function retry(message: LiveChatMessage) {
     markRetry(key, message.clientMessageId);
     void send(message);
@@ -291,14 +280,7 @@ export function LiveChatPanel({ auth, functions, conversation, workspaceId, view
         })}
       </ol>
     </div>
-    <div className={styles.composerWrap}>
-      <div className={styles.typingIndicator} role="status" aria-live="polite">{typingUsers.length > 0 && <><span className={styles.typingDots} aria-hidden="true">•••</span>{typingUsers.map((userId) => memberNames[userId] ?? '팀원').join(', ')}님이 입력 중…</>}</div>
-      <form className={styles.composer} onSubmit={submit}>
-        <textarea aria-label="메시지 입력" value={draft} onChange={(event) => setDraft(key, event.target.value)} onFocus={() => setComposerFocused(true)} onBlur={() => setComposerFocused(false)} onKeyDown={handleKeyDown} maxLength={4000} rows={2} placeholder={`${conversationName}에 메시지 입력`} />
-        <button type="submit" disabled={connection !== 'ready' || !draft.trim()}>전송</button>
-      </form>
-      <div className={styles.composerHint}><span>{connection === 'ready' ? '메시지는 팀원에게 실시간으로 전달됩니다.' : '연결되면 메시지를 보낼 수 있습니다.'}</span><span>Enter 전송 · Shift+Enter 줄바꿈</span></div>
-    </div>
+    <ChatComposer conversationName={conversationName} draft={draft} maxLength={4000} canSend={connection === 'ready'} hint={connection === 'ready' ? '메시지는 팀원에게 실시간으로 전달됩니다.' : '연결되면 메시지를 보낼 수 있습니다.'} onDraftChange={(value) => setDraft(key, value)} onSend={sendDraft} onFocus={() => setComposerFocused(true)} onBlur={() => setComposerFocused(false)} indicator={<div className={styles.typingIndicator} role="status" aria-live="polite">{typingUsers.length > 0 && <><span className={styles.typingDots} aria-hidden="true">•••</span>{typingUsers.map((userId) => memberNames[userId] ?? '팀원').join(', ')}님이 입력 중…</>}</div>} />
     {taskSource?.messageId && <TaskCreateDialog auth={auth} functions={functions} workspaceId={workspaceId} sourceMessageId={taskSource.messageId} sourceContent={taskSource.content} sourceKind={conversation.kind} viewerId={viewerId} memberEmails={memberEmails} memberNames={memberNames} onClose={() => setTaskSource(null)} onCreated={(selfAssigned) => { setTaskSource(null); setTaskNotice(selfAssigned ? '본인 담당 업무가 수락 상태로 저장되었습니다.' : '업무 요청이 저장되었습니다.'); }} />}
   </section>;
 }

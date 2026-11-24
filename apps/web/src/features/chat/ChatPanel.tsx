@@ -1,4 +1,5 @@
-import { useEffect, useRef, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useRef } from 'react';
+import { ChatComposer } from './ChatComposer';
 import { getConversationName, type ConversationSelection } from './demoConversations';
 import { useDemoChatStore, type DemoChatMessage } from './useDemoChatStore';
 import styles from './ChatPanel.module.scss';
@@ -67,18 +68,6 @@ export function ChatPanel({ conversation, workspaceId = 'demo', viewerId = 'demo
     void deliverMessage(message);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    sendDraft();
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      sendDraft();
-    }
-  }
-
   function retry(message: DemoChatMessage) {
     setMessageStatus(roomKey, message.id, 'sending');
     void deliverMessage(message);
@@ -102,12 +91,6 @@ export function ChatPanel({ conversation, workspaceId = 'demo', viewerId = 'demo
         </li>)}
       </ol>
     </div>
-    <div className={styles.composerWrap}>
-      <form className={styles.composer} onSubmit={submit}>
-        <textarea aria-label="메시지 입력" value={draft} onChange={(event) => setDraft(roomKey, event.target.value)} onKeyDown={handleKeyDown} maxLength={2000} rows={2} placeholder={`${conversationName}에 메시지 입력`} />
-        <button type="submit" disabled={!draft.trim()}>전송</button>
-      </form>
-      <div className={styles.composerHint}><span>현재 메시지는 이 화면에만 표시됩니다.</span><span>Enter 전송 · Shift+Enter 줄바꿈</span></div>
-    </div>
+    <ChatComposer conversationName={conversationName} draft={draft} maxLength={2000} canSend hint="현재 메시지는 이 화면에만 표시됩니다." onDraftChange={(value) => setDraft(roomKey, value)} onSend={sendDraft} />
   </section>;
 }

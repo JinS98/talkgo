@@ -8,23 +8,18 @@ import { AccountMenu } from '../auth/AccountMenu';
 import type { UserProfile } from '../auth/userProfile';
 import { useWorkspaceNavigationStore } from '../../store/useWorkspaceNavigationStore';
 import { callWorkspace, createWorkspace, workspaceCreationError, workspaceError } from './workspaceApi';
+import { WorkspacePicker } from './WorkspacePicker';
+import { InviteList } from './InviteList';
+import type { Invite, Membership } from './workspaceTypes';
 import styles from './WorkspaceGate.module.scss';
 
-interface Membership { workspaceId: string; name: string; role: 'owner' | 'member' }
-interface Invite { inviteId: string; email: string; status: string; expiresAt: string }
 interface Member { uid: string; email: string; displayName?: string; role: 'owner' | 'member' }
-
-function PickerMark() {
-  return <svg className={styles.pickerMark} aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 7.5 5 5 5-5" /></svg>;
-}
 
 export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, onSaveDetails, onRefresh }: { auth: Auth; user: User; db: Firestore; functions: Functions; profile: UserProfile; onSaveName: (name: string) => Promise<void>; onSaveDetails: (details: Pick<UserProfile, 'title' | 'bio'>) => Promise<void>; onRefresh: () => Promise<void> }) {
   const displayName = profile.displayName;
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const selectedWorkspaceIdRef = useRef('');
-  const pickerRef = useRef<HTMLDivElement>(null);
-  const pickerButtonRef = useRef<HTMLButtonElement>(null);
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const setView = useWorkspaceNavigationStore((state) => state.setView);
   const [workspaces, setWorkspaces] = useState<Membership[]>([]);
@@ -46,7 +41,6 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   const [invitesWorkspaceId, setInvitesWorkspaceId] = useState('');
   const [invitesError, setInvitesError] = useState('');
   const [localLink, setLocalLink] = useState('');
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => onSnapshot(collection(db, 'users', user.uid, 'workspaces'), (snapshot) => {
     setWorkspaces(snapshot.docs.map((doc) => doc.data() as Membership));
@@ -56,22 +50,6 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   const selected = workspaces.find(({ workspaceId }) => workspaceId === params.get('workspaceId')) ?? workspaces[0];
 
   useEffect(() => { selectedWorkspaceIdRef.current = selected?.workspaceId ?? ''; }, [selected?.workspaceId]);
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const closeOnPointerDown = (event: PointerEvent) => {
-      if (!pickerRef.current?.contains(event.target as Node)) setPickerOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { setPickerOpen(false); pickerButtonRef.current?.focus(); }
-    };
-    document.addEventListener('pointerdown', closeOnPointerDown);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnPointerDown);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [pickerOpen]);
 
   useEffect(() => {
     if (ready && selected?.role !== 'owner' && activeView === 'workspace') setView('chat');
@@ -166,7 +144,6 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   }
 
   function switchWorkspace(workspaceId: string) {
-    setPickerOpen(false);
     if (workspaceId === selected?.workspaceId) return;
     setLocalLink('');
     setError('');
@@ -216,19 +193,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   return (
     <div className={styles.shell}>
       <App auth={auth} db={db} functions={functions} workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={displayName} canManageWorkspace={selected.role === 'owner'} workspaceControls={
-        <div className={styles.workspacePicker} ref={pickerRef}>
-          <button ref={pickerButtonRef} type="button" aria-label="워크스페이스 선택" aria-expanded={pickerOpen} aria-controls="workspace-options" onClick={() => setPickerOpen((open) => !open)}>
-            <span className={styles.pickerIcon} aria-hidden="true">{selected.name.charAt(0).toUpperCase()}</span>
-            <span className={styles.pickerName}>{selected.name}</span>
-            <PickerMark />
-          </button>
-          {pickerOpen && <div id="workspace-options" className={styles.pickerOptions} role="group" aria-label="워크스페이스 목록">
-            {workspaces.map((item) => <button type="button" key={item.workspaceId} className={item.workspaceId === selected.workspaceId ? styles.selectedOption : ''} aria-current={item.workspaceId === selected.workspaceId ? 'true' : undefined} onClick={() => switchWorkspace(item.workspaceId)}>
-              <span className={styles.pickerIcon} aria-hidden="true">{item.name.charAt(0).toUpperCase()}</span>
-              <span>{item.name}</span>
-            </button>)}
-          </div>}
-        </div>
+        <WorkspacePicker selected={selected} workspaces={workspaces} onSelect={switchWorkspace} />
       } accountControls={<AccountMenu auth={auth} user={user} displayName={displayName} profile={profile} onSaveName={onSaveName} onSaveDetails={onSaveDetails} onRefresh={onRefresh} />} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
         <div className={styles.managementHeading}><p className={styles.eyebrow}>WORKSPACE</p><h1>{selected.name} 관리</h1><p>멤버와 초대 현황을 확인하고 새 멤버를 초대하세요.</p></div>
         <div className={styles.managementGrid}>
@@ -238,10 +203,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
             {inviteActionError && <p className={styles.error} role="alert">{inviteActionError}</p>}
           </section>
           <section className={styles.managementCard} aria-labelledby="create-title"><div className={styles.cardHeading}><h2 id="create-title">새 워크스페이스</h2></div><p className={styles.helper}>별도의 팀 공간을 만들고 관리합니다.</p><form className={styles.form} onSubmit={create}><label htmlFor="new-workspace-name">워크스페이스 이름</label><input id="new-workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={createPending} placeholder="새 워크스페이스 이름" /><button type="submit" disabled={createPending}>{createPending ? '만드는 중…' : '새 공간 만들기'}</button></form>{error && <p className={styles.error} role="alert">{error}</p>}</section>
-          <section className={`${styles.managementCard} ${styles.wideCard}`} aria-labelledby="invites-title"><div className={styles.cardHeading}><h2 id="invites-title">초대 현황</h2><div className={styles.cardActions}><span>{invitesWorkspaceId === selected.workspaceId ? invites.length : 0}건</span><button type="button" onClick={refreshInvites} disabled={invitesWorkspaceId !== selected.workspaceId}>새로고침</button></div></div>
-            {invitesError && <p className={styles.error} role="alert">{invitesError}</p>}
-            {!invitesError && (invitesWorkspaceId !== selected.workspaceId ? <p className={styles.empty}>초대 현황을 불러오는 중입니다…</p> : invites.length ? <ul className={styles.invites}>{invites.map((item) => <li key={item.inviteId}><span>{item.email}<small>{item.status === 'pending' ? '대기 중' : item.status === 'accepted' ? '수락됨' : '철회됨'} · 만료 {new Date(item.expiresAt).toLocaleDateString('ko-KR')}</small></span>{item.status === 'pending' && <button type="button" disabled={revokingIds.has(item.inviteId)} onClick={() => revoke(item.inviteId)}>{revokingIds.has(item.inviteId) ? '철회 중…' : '초대 철회'}</button>}</li>)}</ul> : <p className={styles.empty}>아직 보낸 초대가 없습니다.</p>)}
-          </section>
+          <InviteList invites={invites} loading={invitesWorkspaceId !== selected.workspaceId} error={invitesError} revokingIds={revokingIds} onRefresh={refreshInvites} onRevoke={revoke} />
           <section className={`${styles.managementCard} ${styles.wideCard}`} aria-labelledby="members-title"><div className={styles.cardHeading}><h2 id="members-title">워크스페이스 멤버</h2><span>{membersWorkspaceId === selected.workspaceId ? members.length : 0}명</span></div>
             {membersError && <p className={styles.error} role="alert">{membersError}</p>}
             {!membersError && (membersWorkspaceId === selected.workspaceId ? <ul className={styles.members}>{members.map((member) => { const name = member.displayName || `팀원-${member.uid.slice(0, 4).toUpperCase()}`; return <li key={member.uid}><span className={styles.memberAvatar} aria-hidden="true">{name.charAt(0).toUpperCase()}</span><span className={styles.memberIdentity}>{name}<small>{member.email} · {member.role === 'owner' ? '워크스페이스 장' : '멤버'}</small></span></li>; })}</ul> : <p className={styles.empty}>멤버를 불러오는 중입니다…</p>)}
