@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 import type { Functions } from 'firebase/functions';
-import type { TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
+import type { TaskRequestAction, TaskStatus } from '@talkgo/contracts/task';
 import { respondTask, taskResponseError } from './taskResponseApi';
 import { formatDate, TaskHistory } from './TaskHistory';
 import type { WorkspaceTask } from './useWorkspaceTasks';

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const emulatorData = resolve(root, '.taskgo-emulator-data');
+const emulatorData = resolve(root, '.talkgo-emulator-data');
 const children = [];
 const npmCli = process.env.npm_execpath;
 const fixedPorts = [3001, 9099, 8080, 5001, 4000, 4400, 4500, 9150, 9299, 9499];

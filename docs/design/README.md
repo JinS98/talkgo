@@ -1,14 +1,14 @@
-# Taskgo UI/UX 검토 시안
+# Talkgo UI/UX 검토 시안
 
-[상호작용 시안](taskgo-ui-preview.html)에서 Chat·Board·Calendar 탭, 워크스페이스 메뉴, 채팅 메시지의 **업무로 변환** 모달을 확인할 수 있다. 사용자가 승인한 밝은 테마와 2단 구조를 실제 React·SCSS 앱에 반영했다. 이 HTML은 상단 탭이 있는 초기 비교용 시안이며 샘플 데이터만 사용한다. 현재 앱은 채팅·업무 보드·캘린더를 하나의 사이드바에서 전환한다. 실제 기능은 `npm run dev:all`로 실행한 앱에서 확인한다.
+[상호작용 시안](talkgo-ui-preview.html)에서 Chat·Board·Calendar 탭, 워크스페이스 메뉴, 채팅 메시지의 **업무로 변환** 모달을 확인할 수 있다. 초기 Taskgo 업무용 화면을 만든 당시의 시안과 이미지로, 파일명은 새 브랜드에 맞췄지만 캡처 안의 구 로고는 기록으로 남아 있다. 현재 앱은 채팅·업무 보드·캘린더를 하나의 사이드바에서 전환한다. 모임용 UI는 [확장 계획](../11-talkgo-expansion.md)에 따라 추가한다. 실제 기능은 `npm run dev:all`로 실행한 앱에서 확인한다.
 
 | 화면 | 미리보기 |
 |---|---|
-| Chat | [채팅](taskgo-chat.png) |
-| Task Create | [업무 생성 모달](taskgo-modal.png) |
-| Board | [업무 보드](taskgo-board.png) |
-| Calendar | [캘린더](taskgo-calendar.png) |
-| Mobile | [모바일 채팅](taskgo-mobile.png) |
+| Chat | [채팅](talkgo-chat.png) |
+| Task Create | [업무 생성 모달](talkgo-modal.png) |
+| Board | [업무 보드](talkgo-board.png) |
+| Calendar | [캘린더](talkgo-calendar.png) |
+| Mobile | [모바일 채팅](talkgo-mobile.png) |
 
 ## 제안 팔레트
 

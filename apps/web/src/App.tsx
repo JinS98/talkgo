@@ -14,7 +14,7 @@ import type { WorkspaceMember } from './features/chat/useWorkspaceConversations'
 import { callWorkspace } from './features/workspace/workspaceApi';
 import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
 import { liveRoomKey, useLiveChatStore } from './features/chat/useLiveChatStore';
-import type { TaskRecord } from '@taskgo/contracts/task';
+import type { TaskRecord } from '@talkgo/contracts/task';
 import type { AppView } from './types/domain';
 import styles from './App.module.scss';
 

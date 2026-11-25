@@ -8,9 +8,9 @@ import { createServer as createViteServer } from 'vite';
 
 const projectId = 'demo-taskgo';
 assert.equal(process.env.GCLOUD_PROJECT, projectId, 'Run with the demo-taskgo Firebase emulators.');
-process.env.VITE_AUTH_EMULATOR_PORT = process.env.TASKGO_AUTH_EMULATOR_PORT ?? '9099';
-process.env.VITE_FIRESTORE_EMULATOR_PORT = process.env.TASKGO_FIRESTORE_EMULATOR_PORT ?? '8080';
-process.env.VITE_FUNCTIONS_EMULATOR_PORT = process.env.TASKGO_FUNCTIONS_EMULATOR_PORT ?? '5001';
+process.env.VITE_AUTH_EMULATOR_PORT = process.env.TALKGO_AUTH_EMULATOR_PORT ?? '9099';
+process.env.VITE_FIRESTORE_EMULATOR_PORT = process.env.TALKGO_FIRESTORE_EMULATOR_PORT ?? '8080';
+process.env.VITE_FUNCTIONS_EMULATOR_PORT = process.env.TALKGO_FUNCTIONS_EMULATOR_PORT ?? '5001';
 const admin = initializeApp({ projectId }, 'task-links-browser-test');
 const db = getFirestore(admin);
 let vite;

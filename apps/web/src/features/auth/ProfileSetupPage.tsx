@@ -24,7 +24,7 @@ export function ProfileSetupPage({ auth, profile, onSave }: { auth: Auth; profil
   }
 
   return <main className={styles.page}>
-    <div className={styles.intro}><p className={styles.brand}>t<span>:</span>go</p><p className={styles.eyebrow}>TASKGO WORKSPACE</p><h1>팀에서 사용할 이름을 정해 주세요</h1><p>이 이름이 채팅과 업무 담당자, 멤버 목록에 표시됩니다.</p></div>
+    <div className={styles.intro}><p className={styles.brand}><img src="/talkgo-logo.svg" alt="Talkgo" /></p><p className={styles.eyebrow}>TALKGO WORKSPACE</p><h1>공간에서 사용할 이름을 정해 주세요</h1><p>이 이름이 채팅과 업무 담당자, 멤버 목록에 표시됩니다.</p></div>
     <section className={styles.card} aria-labelledby="profile-title">
       <p className={styles.eyebrow}>FIRST STEP</p>
       <h2 id="profile-title">이름 등록</h2>

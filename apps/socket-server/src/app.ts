@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Server } from 'socket.io';
-import type { ClientToServerEvents, CreatedMessage, RoomTarget, SendMessageRequest, ServerToClientEvents, SocketAck, SocketErrorCode, SocketProtocolVersion } from '@taskgo/contracts';
+import type { ClientToServerEvents, CreatedMessage, RoomTarget, SendMessageRequest, ServerToClientEvents, SocketAck, SocketErrorCode, SocketProtocolVersion } from '@talkgo/contracts';
 
 const protocolVersion: SocketProtocolVersion = 1;
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;

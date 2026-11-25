@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { Auth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import type { RoomTarget } from '@taskgo/contracts';
+import type { RoomTarget } from '@talkgo/contracts';
 import { fetchMessagePage, type MessageCursor } from './messageHistory';
 import { useLiveChatStore, type LiveChatMessage } from './useLiveChatStore';
 

@@ -1,6 +1,6 @@
 import { getIdToken, type Auth } from 'firebase/auth';
 import { httpsCallable, type Functions } from 'firebase/functions';
-import type { RespondToTaskRequest, TaskStatus } from '@taskgo/contracts/task';
+import type { RespondToTaskRequest, TaskStatus } from '@talkgo/contracts/task';
 
 export interface TaskResponseResult { taskId: string; status: TaskStatus; dueDate: string; proposedDueDate: string | null }
 

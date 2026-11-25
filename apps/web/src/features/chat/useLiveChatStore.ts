@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CreatedMessage, RoomTarget } from '@taskgo/contracts';
+import type { CreatedMessage, RoomTarget } from '@talkgo/contracts';
 
 export type LiveMessageStatus = 'sending' | 'sent' | 'failed';
 

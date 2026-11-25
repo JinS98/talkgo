@@ -15,7 +15,7 @@ npm run dev:web:emulator
 
 브라우저 통합 테스트는 위 프로세스를 종료한 뒤 `npm run test:live-chat`으로 실행합니다. 두 Chrome 세션을 띄워 채널·DM 송수신·입력 표시, 룸 전환과 오프라인 복구를 확인합니다.
 
-통합 테스트는 위 서버와 에뮬레이터를 종료한 뒤 `npm run test:socket`으로 실행합니다. 이 명령은 에뮬레이터를 자동 실행하고 종료합니다. 기본 주소는 `127.0.0.1:3001`이고, 허용하는 브라우저 Origin은 `http://localhost:5173`과 `http://127.0.0.1:5173`입니다. `PORT`, `SOCKET_HOST`, `SOCKET_ALLOWED_ORIGINS` 환경 변수로 변경할 수 있습니다. 여러 Origin은 쉼표로 구분합니다. 실제 프로젝트에서 `npm run dev:socket` 또는 빌드 후 `npm run start -w @taskgo/socket-server`를 실행할 때는 `FIREBASE_PROJECT_ID`와 Firebase Admin용 애플리케이션 기본 자격 증명이 필요합니다. 배포 시 호스트를 `0.0.0.0`으로 지정하고 실제 웹 Origin을 명시해야 합니다.
+통합 테스트는 위 서버와 에뮬레이터를 종료한 뒤 `npm run test:socket`으로 실행합니다. 이 명령은 에뮬레이터를 자동 실행하고 종료합니다. 기본 주소는 `127.0.0.1:3001`이고, 허용하는 브라우저 Origin은 `http://localhost:5173`과 `http://127.0.0.1:5173`입니다. `PORT`, `SOCKET_HOST`, `SOCKET_ALLOWED_ORIGINS` 환경 변수로 변경할 수 있습니다. 여러 Origin은 쉼표로 구분합니다. 실제 프로젝트에서 `npm run dev:socket` 또는 빌드 후 `npm run start -w @talkgo/socket-server`를 실행할 때는 `FIREBASE_PROJECT_ID`와 Firebase Admin용 애플리케이션 기본 자격 증명이 필요합니다. 배포 시 호스트를 `0.0.0.0`으로 지정하고 실제 웹 Origin을 명시해야 합니다.
 
 클라이언트는 Socket.IO 연결 옵션의 `auth.token`에 로그인 사용자의 Firebase ID 토큰을 넣습니다. 서버는 연결 시 서명·만료·철회·비활성 여부와 이메일 존재 여부를 검사합니다. 토큰 만료 시 연결을 종료하므로 재연결할 때 갱신된 토큰을 전달해야 합니다. 로컬의 `.env.emulator`는 `demo-taskgo`와 Auth·Firestore 에뮬레이터 주소를 지정합니다. 에뮬레이터 호스트 환경 변수는 실제 서비스 환경에 넣지 않습니다.
 

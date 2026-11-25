@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, Timestamp, where, type Firestore } from 'firebase/firestore';
-import type { TaskEventAction, TaskEventRecord } from '@taskgo/contracts/task';
+import type { TaskEventAction, TaskEventRecord } from '@talkgo/contracts/task';
 import type { WorkspaceTask } from './useWorkspaceTasks';
 import styles from './TaskBoardPanel.module.scss';
 

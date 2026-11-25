@@ -66,7 +66,7 @@ try {
   assert.equal(owner.user.emailVerified, false);
   const unverifiedWorkspaceId = await createWorkspace(unverified, 'Immediate Team');
   assert.equal((await adminDb.doc(`workspaces/${unverifiedWorkspaceId}`).get()).get('ownerId'), unverified.user.uid);
-  const workspaceId = await createWorkspace(owner, 'Taskgo Team');
+  const workspaceId = await createWorkspace(owner, 'Talkgo Team');
   assert.equal((await adminDb.collection('workspaceInvites').get()).size, 0);
   await assert.rejects(setDoc(doc(collection(owner.db, 'workspaces')), { name: 'Incomplete', ownerId: owner.user.uid, createdAt: serverTimestamp() }), (error) => error.code === 'permission-denied');
   assert.equal((await adminDb.doc(`workspaces/${workspaceId}`).get()).get('ownerId'), owner.user.uid);

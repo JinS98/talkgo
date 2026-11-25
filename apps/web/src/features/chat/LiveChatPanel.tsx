@@ -3,7 +3,7 @@ import { ChatComposer } from './ChatComposer';
 import { getIdToken, type Auth } from 'firebase/auth';
 import type { Functions } from 'firebase/functions';
 import { io, type Socket } from 'socket.io-client';
-import type { ClientToServerEvents, RoomTarget, ServerToClientEvents, SocketAck } from '@taskgo/contracts';
+import type { ClientToServerEvents, RoomTarget, ServerToClientEvents, SocketAck } from '@talkgo/contracts';
 import { socketUrl } from '../../config/env';
 import { getConversationName, type ConversationSelection } from './demoConversations';
 import { liveRoomKey, useLiveChatStore, type LiveChatMessage } from './useLiveChatStore';

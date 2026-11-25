@@ -1,6 +1,6 @@
 ﻿.page { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,430px); align-items:center; gap:clamp(40px,7vw,120px); min-height:100dvh; padding:clamp(28px,7vw,100px); background:var(--page); }
 .intro { max-width:640px; }.intro h1 { margin:18px 0; color:var(--ink); font-size:clamp(40px,6vw,76px); letter-spacing:-.07em; line-height:1.15; word-break:keep-all; }.intro p:last-child { color:var(--soft-text); font-size:18px; line-height:1.7; }
-.brand { margin:0 0 58px; color:var(--ink); font-size:36px; font-weight:800; letter-spacing:-.09em; }.brand span { color:var(--accent); }
+.brand { margin:0 0 58px; }.brand img { display:block; width:min(252px,100%); height:auto; }
 .eyebrow { margin:0; color:var(--accent); font-size:11px; font-weight:800; letter-spacing:.18em; }
 .card { width:100%; padding:clamp(26px,4vw,42px); border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:0 22px 70px #20283814; }.card h1,.card h2 { margin:26px 0 10px; font-size:clamp(24px,3vw,30px); letter-spacing:-.04em; }
 .modeTabs { display:grid; grid-template-columns:repeat(2,1fr); padding:4px; border:1px solid #e2e6ed; border-radius:9px; background:#f4f5f8; }.modeTabs button { min-height:38px; border:0; border-radius:6px; background:transparent; color:#778294; cursor:pointer; font:inherit; font-weight:700; }.modeTabs button[aria-pressed='true'] { background:#fff; color:var(--accent); box-shadow:0 1px 3px #20283817; }

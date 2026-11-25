@@ -1,6 +1,6 @@
 import { type Firestore, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
-import type { CreateTaskRequest, TaskRecord, TaskSourceType } from '@taskgo/contracts/task';
+import type { CreateTaskRequest, TaskRecord, TaskSourceType } from '@talkgo/contracts/task';
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const requiredFields = ['workspaceId', 'sourceMessageId', 'title', 'assigneeId', 'dueDate', 'reviewRequired'];

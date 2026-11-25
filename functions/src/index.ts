@@ -62,7 +62,7 @@ export const markNotificationRead = onCall({ region }, async (request) => {
 export const suggestTask = onCall({ region, secrets: [taskAiKey], timeoutSeconds: 30 }, async (request) => {
   const user = await activeUser(request);
   const apiKey = taskAiKey.value()?.trim();
-  if (process.env.FUNCTIONS_EMULATOR === 'true' && (process.env.TASKGO_AI_MOCK === '1' || !apiKey || apiKey === 'local-disabled')) {
+  if (process.env.FUNCTIONS_EMULATOR === 'true' && (process.env.TALKGO_AI_MOCK === '1' || !apiKey || apiKey === 'local-disabled')) {
     return suggestTaskFromMessage(db, user.uid, request.data, localTaskCandidates, true);
   }
   if (!apiKey || apiKey === 'local-disabled') throw new HttpsError('failed-precondition', 'AI API 키가 설정되지 않았습니다. 수동으로 업무를 작성해 주세요.');

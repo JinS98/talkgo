@@ -1,6 +1,6 @@
 import { getIdToken, type Auth } from 'firebase/auth';
 import { httpsCallable, type Functions } from 'firebase/functions';
-import type { CreateTaskRequest } from '@taskgo/contracts/task';
+import type { CreateTaskRequest } from '@talkgo/contracts/task';
 
 export async function createTask(auth: Auth, functions: Functions, request: CreateTaskRequest): Promise<{ taskId: string }> {
   const user = auth.currentUser;

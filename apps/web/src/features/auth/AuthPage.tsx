@@ -63,10 +63,10 @@ export function AuthPage({ auth }: AuthPageProps) {
   return (
     <main className={styles.page}>
       <div className={styles.intro}>
-        <p className={styles.brand}>t<span>:</span>go</p>
-        <p className={styles.eyebrow}>TASKGO WORKSPACE</p>
-        <h1>대화가 업무가 되는 순간</h1>
-        <p>팀의 대화, 업무와 일정을 하나의 공간에서 이어가세요.</p>
+        <p className={styles.brand}><img src="/talkgo-logo.svg" alt="Talkgo" /></p>
+        <p className={styles.eyebrow}>TALKGO WORKSPACE</p>
+        <h1>대화가 일정이 되다</h1>
+        <p>일할 때도, 만날 때도. 대화와 일정을 하나의 공간에서 이어가세요.</p>
       </div>
 
       <section className={styles.card} aria-labelledby="auth-title">

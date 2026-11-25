@@ -12,9 +12,9 @@ import { completeOverdueReviews } from '../../../functions/lib/reviewTimeout.js'
 
 const projectId = 'demo-taskgo';
 assert.equal(process.env.GCLOUD_PROJECT, projectId, 'Run with the demo-taskgo Firebase emulators.');
-const authPort = Number(process.env.TASKGO_AUTH_EMULATOR_PORT ?? 9099);
-const firestorePort = Number(process.env.TASKGO_FIRESTORE_EMULATOR_PORT ?? 8080);
-const functionsPort = Number(process.env.TASKGO_FUNCTIONS_EMULATOR_PORT ?? 5001);
+const authPort = Number(process.env.TALKGO_AUTH_EMULATOR_PORT ?? 9099);
+const firestorePort = Number(process.env.TALKGO_FIRESTORE_EMULATOR_PORT ?? 8080);
+const functionsPort = Number(process.env.TALKGO_FUNCTIONS_EMULATOR_PORT ?? 5001);
 process.env.VITE_AUTH_EMULATOR_PORT = String(authPort);
 process.env.VITE_FIRESTORE_EMULATOR_PORT = String(firestorePort);
 process.env.VITE_FUNCTIONS_EMULATOR_PORT = String(functionsPort);
@@ -50,7 +50,7 @@ async function login(page, origin, email) {
   page.on('pageerror', (error) => browserErrors.push(`${email}: ${error.message}`));
   await page.goto(`${origin}/workspace`);
   await page.getByLabel('이메일', { exact: true }).waitFor();
-  if (process.env.TASKGO_CAPTURE_UI && email === 'live-owner@example.com') await page.screenshot({ path: resolve(root, '.tmp-ui-auth.png') });
+  if (process.env.TALKGO_CAPTURE_UI && email === 'live-owner@example.com') await page.screenshot({ path: resolve(root, '.tmp-ui-auth.png') });
   await page.getByLabel('이메일', { exact: true }).fill(email);
   await page.getByLabel('비밀번호').fill('StrongPass123!');
   await page.getByRole('button', { name: '이메일로 로그인' }).click();
@@ -75,7 +75,7 @@ async function chooseDue(dialog, dueLocal, clickIcon = false) {
   const timeGrid = picker.locator('[class*="timeGrid"]');
   await timeGrid.evaluate((element) => new Promise((resolve) => requestAnimationFrame(resolve)));
   assert.equal(await timeGrid.evaluate((element) => element.scrollHeight > element.clientHeight), true, 'The available times must scroll within the picker.');
-  if (process.env.TASKGO_CAPTURE_UI && !clickIcon) await dialog.screenshot({ path: resolve(root, '.tmp-ui-due-picker.png') });
+  if (process.env.TALKGO_CAPTURE_UI && !clickIcon) await dialog.screenshot({ path: resolve(root, '.tmp-ui-due-picker.png') });
   const [year, month, day] = dueLocal.slice(0, 10).split('-').map(Number);
   if (await picker.getByText(`${year}년 ${month}월`).count() === 0) await picker.getByRole('button', { name: '다음 달' }).click();
   await picker.getByRole('button', { name: `${year}년 ${month}월 ${day}일` }).click();
@@ -134,7 +134,7 @@ try {
   await login(ownerPage, origin, owner.email);
   await login(memberPage, origin, member.email);
   await ownerPage.getByRole('button', { name: '워크스페이스 관리' }).click();
-  if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-management.png') });
+  if (process.env.TALKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-management.png') });
   let releaseInvite;
   let notifyInviteStarted;
   const inviteHeld = new Promise((resolve) => { releaseInvite = resolve; });
@@ -156,7 +156,7 @@ try {
   await ownerPage.getByRole('button', { name: '채팅' }).click();
   assert.equal((await db.doc(`channels/general_${workspaceId}`).get()).get('name'), '전체');
   await visibleOnce(ownerPage, 'history channel 64');
-  if (process.env.TASKGO_CAPTURE_UI) {
+  if (process.env.TALKGO_CAPTURE_UI) {
     await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-chat.png') });
     await ownerPage.setViewportSize({ width: 390, height: 844 });
     await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-mobile.png') });
@@ -187,7 +187,7 @@ try {
   assert.equal((await db.collection('tasks').get()).size, 0, 'Clicking outside the dialog must not create a task.');
   await channelSource.getByRole('button', { name: '업무 요청' }).click();
   let taskDialog = ownerPage.getByRole('dialog', { name: '업무 요청 만들기' });
-  if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-modal.png') });
+  if (process.env.TALKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-modal.png') });
   const dialogBounds = await taskDialog.boundingBox();
   const submitBounds = await taskDialog.getByRole('button', { name: '업무 요청 저장' }).boundingBox();
   assert.ok(dialogBounds && submitBounds && submitBounds.y + submitBounds.height <= dialogBounds.y + dialogBounds.height - 4, 'Task submit action must remain visible in a short dialog.');
@@ -203,7 +203,7 @@ try {
   await taskDialog.getByRole('button', { name: /history channel 64/ }).click();
   assert.equal(await taskDialog.getByLabel('업무 제목').inputValue(), 'history channel 64');
   assert.equal((await db.collection('tasks').get()).size, 0, 'Choosing a suggestion must not create a task.');
-  if (process.env.TASKGO_CAPTURE_TASK_DIALOG) {
+  if (process.env.TALKGO_CAPTURE_TASK_DIALOG) {
     await taskDialog.screenshot({ path: resolve(root, '.tmp-day18-dialog.png') });
     await ownerPage.setViewportSize({ width: 390, height: 844 });
     await taskDialog.screenshot({ path: resolve(root, '.tmp-day18-dialog-mobile.png') });
@@ -240,11 +240,11 @@ try {
   assert.equal(await ownerPage.getByTitle(/^고객 요청 정리 ·/).count(), 0);
   await ownerPage.getByRole('button', { name: '팀 전체 일정' }).click();
   await requestedEvent.waitFor();
-  if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-calendar.png') });
+  if (process.env.TALKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-calendar.png') });
   await ownerPage.getByRole('button', { name: '채팅' }).click();
 
   await memberPage.getByRole('button', { name: '업무 보드' }).click();
-  if (process.env.TASKGO_CAPTURE_UI) await memberPage.screenshot({ path: resolve(root, '.tmp-ui-board.png') });
+  if (process.env.TALKGO_CAPTURE_UI) await memberPage.screenshot({ path: resolve(root, '.tmp-ui-board.png') });
   const memberTaskCard = memberPage.getByRole('article').filter({ hasText: '고객 요청 정리' });
   await memberTaskCard.getByText('요청 테스트 방장').waitFor();
   await memberTaskCard.getByText('담당 테스트 멤버').waitFor();
@@ -488,7 +488,7 @@ try {
   await dayCell.getByRole('button', { name: /업무 \d+개 모두 보기/ }).click();
   const dayDialog = ownerPage.getByRole('dialog', { name: `${part('month')}월 ${part('day')}일` });
   await dayDialog.waitFor();
-  if (process.env.TASKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-calendar-more.png') });
+  if (process.env.TALKGO_CAPTURE_UI) await ownerPage.screenshot({ path: resolve(root, '.tmp-ui-calendar-more.png') });
   for (let index = 0; index < 6; index += 1) await dayDialog.getByText(`캘린더 혼잡 ${index + 1}`, { exact: true }).waitFor();
   await ownerPage.keyboard.press('Escape');
   await dayDialog.waitFor({ state: 'hidden' });

@@ -1,5 +1,5 @@
 {
-  "name": "@taskgo/web",
+  "name": "@talkgo/web",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@fullcalendar/react": "^7.1.5",
-    "@taskgo/contracts": "0.0.1",
+    "@talkgo/contracts": "0.0.1",
     "firebase": "^11.10.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

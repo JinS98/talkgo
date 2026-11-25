@@ -11,9 +11,9 @@ import { createServer as createViteServer } from 'vite';
 
 const projectId = 'demo-taskgo';
 assert.equal(process.env.GCLOUD_PROJECT, projectId, 'Run with the demo-taskgo Firebase emulators.');
-const authPort = Number(process.env.TASKGO_AUTH_EMULATOR_PORT ?? 9099);
-const firestorePort = Number(process.env.TASKGO_FIRESTORE_EMULATOR_PORT ?? 8080);
-const functionsPort = Number(process.env.TASKGO_FUNCTIONS_EMULATOR_PORT ?? 5001);
+const authPort = Number(process.env.TALKGO_AUTH_EMULATOR_PORT ?? 9099);
+const firestorePort = Number(process.env.TALKGO_FIRESTORE_EMULATOR_PORT ?? 8080);
+const functionsPort = Number(process.env.TALKGO_FUNCTIONS_EMULATOR_PORT ?? 5001);
 process.env.VITE_AUTH_EMULATOR_PORT = String(authPort);
 process.env.VITE_FIRESTORE_EMULATOR_PORT = String(firestorePort);
 process.env.VITE_FUNCTIONS_EMULATOR_PORT = String(functionsPort);
@@ -91,11 +91,11 @@ try {
   const memberProfile = ownerPage.getByRole('complementary', { name: '프로필' });
   await memberProfile.getByText('화면을 설계합니다.').waitFor();
   await memberProfile.getByText(member.email).waitFor();
-  if (process.env.TASKGO_CAPTURE_PROFILE) await ownerPage.screenshot({ path: resolve(root, '.tmp-profile-panel.png') });
+  if (process.env.TALKGO_CAPTURE_PROFILE) await ownerPage.screenshot({ path: resolve(root, '.tmp-profile-panel.png') });
   await ownerPage.setViewportSize({ width: 390, height: 844 });
   await memberProfile.evaluate(async (element) => { await Promise.all(element.getAnimations().map((animation) => animation.finished)); });
   const panelBounds = await memberProfile.boundingBox();
-  if (process.env.TASKGO_CAPTURE_PROFILE) await ownerPage.screenshot({ path: resolve(root, '.tmp-profile-mobile.png') });
+  if (process.env.TALKGO_CAPTURE_PROFILE) await ownerPage.screenshot({ path: resolve(root, '.tmp-profile-mobile.png') });
   assert.ok(panelBounds && panelBounds.x >= 0 && panelBounds.x + panelBounds.width <= 391, `The profile panel must fit a 390px viewport: ${JSON.stringify(panelBounds)}`);
   await ownerPage.setViewportSize({ width: 1280, height: 720 });
   await memberProfile.getByRole('button', { name: '메시지 보내기' }).click();

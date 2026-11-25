@@ -161,7 +161,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   if (!selected) return (
     <main className={styles.page}>
       <div className={styles.emptyWorkspace}>
-        <div className={styles.emptyHeading}><p className={styles.eyebrow}>TASKGO WORKSPACE</p><h1>워크스페이스에 들어가기</h1><p>새 공간을 만들거나, 팀에서 받은 초대 링크로 참여하세요.</p></div>
+        <div className={styles.emptyHeading}><p className={styles.eyebrow}>TALKGO WORKSPACE</p><h1>워크스페이스에 들어가기</h1><p>새 공간을 만들거나, 팀에서 받은 초대 링크로 참여하세요.</p></div>
         <div className={styles.emptyOptions}>
           <section className={styles.card}>
             <h2>워크스페이스 만들기</h2>

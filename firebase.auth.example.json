@@ -3,7 +3,7 @@
     "providers": {
       "emailPassword": true,
       "googleSignIn": {
-        "oAuthBrandDisplayName": "Taskgo",
+        "oAuthBrandDisplayName": "Talkgo",
         "supportEmail": "YOUR_SUPPORT_EMAIL@example.com",
         "authorizedRedirectUris": [
           "http://localhost"

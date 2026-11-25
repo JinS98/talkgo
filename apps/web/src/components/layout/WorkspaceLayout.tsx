@@ -72,7 +72,7 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
 
       <aside className={styles.sidebar} aria-label="워크스페이스 영역">
         <nav className={styles.primaryNav} aria-label="화면 전환">
-          <span className={styles.railBrand} aria-label="Taskgo">t<span>:</span>go</span>
+          <span className={styles.railBrand}><img src="/favicon.svg" alt="Talkgo" /></span>
           <ul className={styles.primaryList}>
             {primaryViews.map(({ id, label }) => <li key={id}>
               <button className={`${styles.primaryButton} ${activeView === id ? styles.active : ''}`} type="button" aria-pressed={activeView === id} onClick={() => setView(id)}>
@@ -85,7 +85,7 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
 
         <div className={styles.sidebarBody}>
           <div className={styles.brandRow}>
-            <span className={styles.brandName}>TASKGO</span>
+            <span className={styles.brandName}>TALKGO</span>
             <strong className={styles.sidebarTitle}>대화</strong>
           </div>
 
@@ -93,7 +93,7 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
             {workspaceControls ?? <div className={styles.workspaceCard}>
               <span className={styles.workspaceIcon} aria-hidden="true">T</span>
               <div>
-                <strong>{workspaceName ?? 'Taskgo 데모 팀'}</strong>
+                <strong>{workspaceName ?? 'Talkgo 데모 팀'}</strong>
                 <span>{canManageWorkspace ? '워크스페이스 장' : workspaceName ? '멤버' : '샘플 데이터'}</span>
               </div>
             </div>}

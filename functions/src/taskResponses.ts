@@ -1,6 +1,6 @@
 import { type Firestore, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
-import type { RespondToTaskRequest, TaskRequestAction, TaskStatus } from '@taskgo/contracts/task';
+import type { RespondToTaskRequest, TaskRequestAction, TaskStatus } from '@talkgo/contracts/task';
 import { calculateReviewDeadline } from './reviewDeadline.js';
 import { writeReviewNotification } from './reviewNotifications.js';
 

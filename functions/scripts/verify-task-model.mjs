@@ -11,9 +11,9 @@ import { calculateReviewDeadline } from '../lib/reviewDeadline.js';
 
 assert.equal(process.env.GCLOUD_PROJECT, 'demo-taskgo');
 const projectId = 'demo-taskgo';
-const authPort = Number(process.env.TASKGO_AUTH_EMULATOR_PORT ?? 9099);
-const firestorePort = Number(process.env.TASKGO_FIRESTORE_EMULATOR_PORT ?? 8080);
-const functionsPort = Number(process.env.TASKGO_FUNCTIONS_EMULATOR_PORT ?? 5001);
+const authPort = Number(process.env.TALKGO_AUTH_EMULATOR_PORT ?? 9099);
+const firestorePort = Number(process.env.TALKGO_FIRESTORE_EMULATOR_PORT ?? 8080);
+const functionsPort = Number(process.env.TALKGO_FUNCTIONS_EMULATOR_PORT ?? 5001);
 const admin = initializeAdminApp({ projectId }, 'task-model-test');
 const adminDb = getAdminFirestore(admin);
 const apps = [];

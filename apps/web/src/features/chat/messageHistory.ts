@@ -1,5 +1,5 @@
 import { collection, documentId, getDocsFromServer, limit, orderBy, query, startAfter, where, type DocumentData, type Firestore, type QueryDocumentSnapshot } from 'firebase/firestore';
-import type { CreatedMessage, RoomTarget } from '@taskgo/contracts';
+import type { CreatedMessage, RoomTarget } from '@talkgo/contracts';
 
 export const MESSAGE_PAGE_SIZE = 30;
 export type MessageCursor = QueryDocumentSnapshot<DocumentData>;

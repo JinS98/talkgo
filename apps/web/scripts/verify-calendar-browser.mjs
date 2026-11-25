@@ -9,9 +9,9 @@ import { createServer as createViteServer } from 'vite';
 
 const projectId = 'demo-taskgo';
 assert.equal(process.env.GCLOUD_PROJECT, projectId, 'Run with the demo-taskgo Firebase emulators.');
-process.env.VITE_AUTH_EMULATOR_PORT = process.env.TASKGO_AUTH_EMULATOR_PORT ?? '9099';
-process.env.VITE_FIRESTORE_EMULATOR_PORT = process.env.TASKGO_FIRESTORE_EMULATOR_PORT ?? '8080';
-process.env.VITE_FUNCTIONS_EMULATOR_PORT = process.env.TASKGO_FUNCTIONS_EMULATOR_PORT ?? '5001';
+process.env.VITE_AUTH_EMULATOR_PORT = process.env.TALKGO_AUTH_EMULATOR_PORT ?? '9099';
+process.env.VITE_FIRESTORE_EMULATOR_PORT = process.env.TALKGO_FIRESTORE_EMULATOR_PORT ?? '8080';
+process.env.VITE_FUNCTIONS_EMULATOR_PORT = process.env.TALKGO_FUNCTIONS_EMULATOR_PORT ?? '5001';
 const root = resolve(process.cwd(), '../..');
 const admin = initializeApp({ projectId }, 'calendar-browser-test');
 const db = getFirestore(admin);
@@ -61,7 +61,7 @@ try {
   const popover = page.locator(`[role="dialog"][data-date="${dateKey}"]`);
   await popover.waitFor();
   for (let index = 0; index < 6; index += 1) await popover.getByText(`캘린더 일정 ${index + 1}`, { exact: true }).waitFor();
-  if (process.env.TASKGO_CAPTURE_UI) await page.screenshot({ path: resolve(root, '.tmp-ui-calendar-more.png') });
+  if (process.env.TALKGO_CAPTURE_UI) await page.screenshot({ path: resolve(root, '.tmp-ui-calendar-more.png') });
   await popover.getByRole('button').click();
   await page.getByRole('button', { name: '회의 추가' }).click();
   const dialog = page.getByRole('dialog', { name: '회의 추가' });
@@ -122,7 +122,7 @@ try {
   await draggable.dragTo(memberPage.locator(`[data-date="${targetKey}"][role="cell"]`));
   const dueDialog = memberPage.getByRole('dialog', { name: '마감 변경 제안' });
   await dueDialog.waitFor();
-  if (process.env.TASKGO_CAPTURE_UI) await memberPage.screenshot({ path: resolve(root, '.tmp-ui-calendar-proposal.png') });
+  if (process.env.TALKGO_CAPTURE_UI) await memberPage.screenshot({ path: resolve(root, '.tmp-ui-calendar-proposal.png') });
   assert.equal((await dragTaskRef.get()).get('dueDate').toMillis(), originalDue.toMillis(), 'Dragging must not directly change the stored due date.');
   const proposedLocal = await dueDialog.getByLabel('제안 마감 날짜·시간').inputValue();
   assert.notEqual(proposedLocal, local(originalDue.toDate()));
@@ -144,7 +144,7 @@ try {
   const rejectedTask = await dragTaskRef.get();
   assert.equal(rejectedTask.get('dueDate').toMillis(), approvedTask.get('dueDate').toMillis());
   assert.equal(rejectedTask.get('proposedDueDate'), null);
-  if (process.env.TASKGO_CAPTURE_UI) await page.screenshot({ path: resolve(root, '.tmp-ui-calendar.png') });
+  if (process.env.TALKGO_CAPTURE_UI) await page.screenshot({ path: resolve(root, '.tmp-ui-calendar.png') });
   assert.deepEqual(errors, []);
   console.log('PASS: calendar filters, overflow, meeting visibility, drag proposal, approval, and rejection without premature due-date change.');
 } finally {

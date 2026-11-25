@@ -22,7 +22,7 @@ if (process.env.FIREBASE_AUTH_EMULATOR_HOST && !projectId.startsWith('demo-')) {
 const services = createFirebaseSocketServices(projectId);
 const app = createSocketApp({ allowedOrigins, services });
 const address = await listenSocketApp(app, port, host);
-console.log(`Taskgo socket server listening on http://${host}:${address.port}`);
+console.log(`Talkgo socket server listening on http://${host}:${address.port}`);
 
 let shuttingDown = false;
 async function shutdown() {

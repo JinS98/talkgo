@@ -8,7 +8,7 @@
 .sidebar { display:grid; grid-template-columns:66px minmax(0,1fr); min-height:0; overflow:hidden; border-right:1px solid var(--line); background:var(--sidebar); }
 .primaryNav { display:flex; flex-direction:column; align-items:center; min-height:0; padding:14px 6px 12px; border-right:1px solid var(--line); background:#f2f3f8; }
 .railBrand { display:flex; flex:0 0 auto; align-items:center; justify-content:center; width:50px; height:42px; margin-bottom:24px; color:var(--ink); font-size:19px; font-weight:850; letter-spacing:-.1em; white-space:nowrap; }
-.railBrand span { color:var(--accent); }
+.railBrand img { display:block; width:38px; height:38px; }
 .primaryList { display:flex; flex-direction:column; width:100%; gap:7px; margin:0; padding:0; list-style:none; }
 .primaryButton,.manageLink { display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; min-height:58px; gap:5px; padding:7px 2px; border:0; border-radius:10px; background:transparent; color:#647086; cursor:pointer; font:inherit; font-size:10px; font-weight:750; line-height:1.15; text-align:center; word-break:keep-all; }
 .primaryButton:hover,.manageLink:hover { background:#e8eaf2; color:var(--ink); }
@@ -59,7 +59,7 @@
   .shell { display:flex; flex-direction:column; }
   .sidebar { display:flex; flex:0 0 auto; flex-direction:column; max-height:min(42dvh,250px); border-right:0; border-bottom:1px solid var(--line); }
   .primaryNav { flex:0 0 50px; flex-direction:row; gap:8px; padding:5px 10px; border-right:0; border-bottom:1px solid var(--line); }
-  .railBrand { width:auto; height:auto; margin:0 8px 0 0; font-size:18px; }
+  .railBrand { width:auto; height:auto; margin:0 8px 0 0; }
   .primaryList { flex:1; flex-direction:row; justify-content:center; width:auto; gap:3px; }
   .primaryButton,.manageLink { flex-direction:row; width:auto; min-height:36px; gap:4px; padding:5px 7px; font-size:10px; white-space:nowrap; }
   .primaryButton .navIcon,.manageLink .navIcon { flex-basis:16px; width:16px; }
@@ -78,4 +78,4 @@
   .topbar { flex-basis:50px; padding-inline:20px; }
   .main { padding:20px 12px; } .chatMain { padding:0; }
 }
-@media (max-width:390px) { .primaryNav { gap:2px; padding-inline:6px; } .railBrand { margin-right:2px; font-size:16px; } .primaryButton,.manageLink { padding-inline:4px; font-size:9px; } }
+@media (max-width:390px) { .primaryNav { gap:2px; padding-inline:6px; } .railBrand { margin-right:2px; } .railBrand img { width:32px; height:32px; } .primaryButton,.manageLink { padding-inline:4px; font-size:9px; } }

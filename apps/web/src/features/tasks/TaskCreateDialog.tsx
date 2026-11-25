@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Auth } from 'firebase/auth';
 import type { Functions } from 'firebase/functions';
-import type { CreateTaskRequest, TaskSourceType } from '@taskgo/contracts/task';
+import type { CreateTaskRequest, TaskSourceType } from '@talkgo/contracts/task';
 import { createTask, suggestTask, taskCreationError, taskSuggestionError, type TaskSuggestionResult } from './createTaskApi';
 import styles from './TaskCreateDialog.module.scss';
 

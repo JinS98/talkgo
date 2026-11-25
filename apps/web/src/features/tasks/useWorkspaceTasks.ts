@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, Timestamp, where, type Firestore } from 'firebase/firestore';
-import type { TaskRecord } from '@taskgo/contracts/task';
+import type { TaskRecord } from '@talkgo/contracts/task';
 
 export type WorkspaceTask = TaskRecord<Timestamp> & { id: string };
 export interface WorkspaceTaskState {

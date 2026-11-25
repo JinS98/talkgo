@@ -21,8 +21,8 @@ export function getFirebaseServices(): FirebaseServices {
   }
 
   const config = getFirebaseClientConfig();
-  const existingApp = getApps().find(({ name }) => name === 'taskgo');
-  const app = existingApp ?? initializeApp(config, 'taskgo');
+  const existingApp = getApps().find(({ name }) => name === 'talkgo');
+  const app = existingApp ?? initializeApp(config, 'talkgo');
   const auth = getAuth(app);
   const db = getFirestore(app);
   const functions = getFunctions(app, 'asia-northeast3');

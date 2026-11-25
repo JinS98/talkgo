@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { deleteApp, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import type { RoomTarget, SendMessageRequest } from '@taskgo/contracts';
+import type { RoomTarget, SendMessageRequest } from '@talkgo/contracts';
 import type { SaveMessageResult, SocketServices } from './app.js';
 
 const rejectedTokenCodes = new Set([
@@ -15,7 +15,7 @@ const rejectedTokenCodes = new Set([
 ]);
 
 export function createFirebaseSocketServices(projectId: string): SocketServices & { close(): Promise<void> } {
-  const app = initializeApp({ projectId }, 'taskgo-socket-server');
+  const app = initializeApp({ projectId }, 'talkgo-socket-server');
   const auth = getAuth(app);
   const db = getFirestore(app);
 
