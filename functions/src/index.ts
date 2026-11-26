@@ -18,26 +18,27 @@ import { openDirectMessage } from './directMessages.js';
 initializeApp();
 const db = getFirestore();
 const region = 'asia-northeast3';
+const enforceAppCheck = process.env.TALKGO_ENFORCE_APP_CHECK === 'true';
 const smtpUrl = defineSecret('INVITE_SMTP_URL');
 const taskAiKey = defineSecret('OPENAI_API_KEY');
 const inviteLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 
-export const createTask = onCall({ region }, async (request) => {
+export const createTask = onCall({ region, enforceAppCheck }, async (request) => {
   const user = await activeUser(request);
   return createTaskRecord(db, user.uid, request.data);
 });
 
-export const createDm = onCall({ region }, async (request) => {
+export const createDm = onCall({ region, enforceAppCheck }, async (request) => {
   const user = await activeUser(request);
   return openDirectMessage(db, user.uid, request.data);
 });
 
-export const createMeeting = onCall({ region }, async (request) => {
+export const createMeeting = onCall({ region, enforceAppCheck }, async (request) => {
   const user = await activeUser(request);
   return createMeetingRecord(db, user.uid, request.data);
 });
 
-export const respondTask = onCall({ region }, async (request) => {
+export const respondTask = onCall({ region, enforceAppCheck }, async (request) => {
   const user = await activeUser(request);
   return respondToTaskRequest(db, user.uid, request.data);
 });
@@ -50,7 +51,7 @@ export const completeExpiredReviews = onSchedule({ schedule: 'every 1 minutes', 
   if (reminders.sent) logger.info('Review reminders', reminders);
 });
 
-export const markNotificationRead = onCall({ region }, async (request) => {
+export const markNotificationRead = onCall({ region, enforceAppCheck }, async (request) => {
   const user = await activeUser(request);
   if (!request.data || typeof request.data !== 'object' || Array.isArray(request.data) || Object.keys(request.data).length !== 1) {
     throw new HttpsError('invalid-argument', '알림 ID를 확인해 주세요.');
@@ -59,7 +60,7 @@ export const markNotificationRead = onCall({ region }, async (request) => {
   return { notificationId: request.data.notificationId };
 });
 
-export const suggestTask = onCall({ region, secrets: [taskAiKey], timeoutSeconds: 30 }, async (request) => {
+export const suggestTask = onCall({ region, enforceAppCheck, secrets: [taskAiKey], timeoutSeconds: 30 }, async (request) => {
   const user = await activeUser(request);
   const apiKey = taskAiKey.value()?.trim();
   if (process.env.FUNCTIONS_EMULATOR === 'true' && (process.env.TALKGO_AI_MOCK === '1' || !apiKey || apiKey === 'local-disabled')) {
@@ -102,7 +103,7 @@ function inviteLink(inviteId: string, token: string): string {
   return url.toString();
 }
 
-export const inviteMember = onCall({ region, secrets: [smtpUrl] }, async (request) => {
+export const inviteMember = onCall({ region, enforceAppCheck, secrets: [smtpUrl] }, async (request) => {
   const user = await activeUser(request);
   const workspaceId = field(request.data, 'workspaceId');
   const invitedEmail = field(request.data, 'email').toLowerCase();
@@ -162,7 +163,7 @@ export const inviteMember = onCall({ region, secrets: [smtpUrl] }, async (reques
   return process.env.FUNCTIONS_EMULATOR === 'true' ? { inviteId: invite.id, link } : { inviteId: invite.id };
 });
 
-export const listInvites = onCall({ region }, async (request) => {
+export const listInvites = onCall({ region, enforceAppCheck }, async (request) => {
   const user = await activeUser(request);
   const workspaceId = field(request.data, 'workspaceId');
   await ownerWorkspace(workspaceId, user.uid);
@@ -175,7 +176,7 @@ export const listInvites = onCall({ region }, async (request) => {
   })) };
 });
 
-export const revokeInvite = onCall({ region }, async (request) => {
+export const revokeInvite = onCall({ region, enforceAppCheck }, async (request) => {
   const user = await activeUser(request);
   const invite = db.doc(`workspaceInvites/${field(request.data, 'inviteId')}`);
   await db.runTransaction(async (transaction) => {
@@ -195,7 +196,7 @@ export const revokeInvite = onCall({ region }, async (request) => {
   return { revoked: true };
 });
 
-export const acceptInvite = onCall({ region }, async (request) => {
+export const acceptInvite = onCall({ region, enforceAppCheck }, async (request) => {
   const user = await activeUser(request);
   const inviteId = field(request.data, 'inviteId');
   const token = field(request.data, 'token');

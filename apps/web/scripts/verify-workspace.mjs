@@ -138,6 +138,11 @@ try {
   await assertFails(ownerDb.doc(`${workspacePath}/members/${owner.user.uid}`).update({ role: 'member' }));
   await assertFails(unknownDb.doc(workspacePath).get());
   await assertFails(publicDb.doc(workspacePath).get());
+  await adminDb.doc(`${workspacePath}/members/malformed`).set({ uid: 'malformed', role: 'guest' });
+  await assertFails(rules.authenticatedContext('malformed').firestore().doc(workspacePath).get());
+  await assertFails(ownerDb.doc(`workspaces/${unverifiedWorkspaceId}`).get());
+  await assertFails(ownerDb.collection(`workspaces/${unverifiedWorkspaceId}/members`).get());
+  await assertSucceeds(unknownDb.doc(`workspaces/${unverifiedWorkspaceId}`).get());
   await assertSucceeds(guestDb.doc(`users/${guest.user.uid}/workspaces/${workspaceId}`).get());
   await assertFails(ownerDb.doc(`users/${guest.user.uid}/workspaces/${workspaceId}`).get());
   await assertFails(guestDb.doc(`workspaceInvites/${second.inviteId}`).get());
@@ -149,6 +154,10 @@ try {
   await adminDb.doc('messages/dm-message').set({ workspaceId, sourceType: 'dm', dmRoomId: 'private', content: 'private' });
   await adminDb.doc('tasks/sample').set({ workspaceId, title: 'Visible task metadata', sourceMessageId: 'dm-message' });
   await adminDb.doc('meetings/sample').set({ workspaceId, title: 'Team meeting' });
+  await adminDb.doc('meetupProposals/sample').set({ workspaceId, title: 'Private proposal' });
+  await adminDb.doc('meetupProposals/sample/votes/1_owner').set({ voterId: owner.user.uid, choice: 'YES' });
+  await adminDb.doc('meetupEvents/sample').set({ workspaceId, title: 'Private event' });
+  await adminDb.doc('meetupSeries/sample').set({ workspaceId, title: 'Private series' });
   await assertSucceeds(guestDb.doc('channels/general').get());
   await assertFails(unknownDb.doc('channels/general').get());
   await assertSucceeds(guestDb.doc('messages/channel-message').get());
@@ -161,8 +170,16 @@ try {
   await assertFails(guestDb.doc('dmRooms/private').get());
   await assertSucceeds(guestDb.doc('tasks/sample').get());
   await assertFails(unknownDb.doc('tasks/sample').get());
+  await assertFails(rules.authenticatedContext('malformed').firestore().doc('tasks/sample').get());
   await assertSucceeds(guestDb.doc('meetings/sample').get());
   await assertFails(unknownDb.doc('meetings/sample').get());
+  await assertFails(unknownDb.doc('channels/general').get());
+  for (const path of ['meetupProposals/sample', 'meetupProposals/sample/votes/1_owner', 'meetupEvents/sample', 'meetupSeries/sample']) {
+    await assertFails(ownerDb.doc(path).get());
+    await assertFails(guestDb.doc(path).get());
+    await assertFails(publicDb.doc(path).get());
+    await assertFails(ownerDb.doc(path).set({ workspaceId, title: 'forged' }));
+  }
   await assertFails(ownerDb.doc('messages/channel-message').set({ workspaceId, content: 'forged' }));
   await assertFails(guestDb.doc(workspacePath).update({ ownerId: guest.user.uid }));
   await rejected(guest.call('listInvites', { workspaceId }), 'permission-denied');

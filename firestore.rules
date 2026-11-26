@@ -14,7 +14,8 @@ service cloud.firestore {
     }
 
     function isMember(workspaceId) {
-      return signedIn() && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+      let memberPath = /databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid);
+      return signedIn() && exists(memberPath) && get(memberPath).data.role in ['owner', 'member'];
     }
 
     function isDmParticipant(workspaceId, roomId) {
@@ -128,6 +129,23 @@ service cloud.firestore {
     match /meetings/{meetingId} {
       allow get, list: if isMember(resource.data.workspaceId);
       allow write: if false;
+    }
+
+    // 모임 데이터는 서버 검증과 참가자별 조회가 구현될 때까지 클라이언트에 노출하지 않는다.
+    match /meetupProposals/{proposalId} {
+      allow read, write: if false;
+
+      match /votes/{voteId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /meetupEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /meetupSeries/{seriesId} {
+      allow read, write: if false;
     }
 
     match /notifications/{notificationId} {

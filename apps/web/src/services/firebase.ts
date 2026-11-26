@@ -1,4 +1,5 @@
 import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
@@ -23,6 +24,13 @@ export function getFirebaseServices(): FirebaseServices {
   const config = getFirebaseClientConfig();
   const existingApp = getApps().find(({ name }) => name === 'talkgo');
   const app = existingApp ?? initializeApp(config, 'talkgo');
+  const appCheckSiteKey = import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY?.trim();
+  if (appCheckSiteKey && !useFirebaseEmulators && typeof window !== 'undefined') {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  }
   const auth = getAuth(app);
   const db = getFirestore(app);
   const functions = getFunctions(app, 'asia-northeast3');
