@@ -11,7 +11,7 @@
 - Firestore/Functions/Storage: 무료 할당량을 우선 활용.
 - AI: 명시적 클릭에만 실행, 1인당 호출 제한과 예산 통제.
 
-## Taskgo 배포 절차
+## 기존 운영 리소스 배포 절차
 
 실제 프로젝트는 `taskgo-jins98`, Hosting 주소는 `https://taskgo-jins98.web.app`, 리전은 `asia-northeast3`이다. 먼저 청구 계정을 연결하고 이 프로젝트만 포함하는 월간 예산 알림을 만든다. 현재 청구 계정 연결 여부와 배포 상태는 [34일차 기록](daily/day-34.md)에 적는다. 예산 알림은 지출을 중단시키지 않는다.
 
@@ -31,10 +31,10 @@
    firebase deploy --only firestore,functions --project taskgo-jins98
    ```
 
-5. 소켓 서버 URL을 웹 빌드에 명시적으로 넣고 Hosting에 올린다. `build:prod:web`은 HTTP·localhost 주소를 거부한다. `apps/web/.env.local`의 Firebase 웹 설정은 `taskgo-jins98`를 가리켜야 한다.
+5. 소켓 서버 URL과 **배포 대상 Firebase 프로젝트 ID**를 웹 빌드에 명시적으로 넣고 Hosting에 올린다. `build:prod:web`은 HTTP·localhost 주소, `demo-` 프로젝트, `.env.local`과 배포 대상의 프로젝트 ID 불일치를 거부한다. 현재 운영 웹은 35일차 Taskgo 버전이며 새 Talkgo 빌드는 별도 검증·배포 전이다.
 
    ```powershell
-   npm run build:prod:web -- https://CLOUD_RUN_URL
+   npm run build:prod:web -- https://CLOUD_RUN_URL taskgo-jins98
    firebase deploy --only hosting --project taskgo-jins98
    ```
 
