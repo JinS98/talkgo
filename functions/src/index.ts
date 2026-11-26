@@ -84,8 +84,11 @@ async function activeUser(request: CallableRequest<unknown>): Promise<UserRecord
 }
 
 async function ownerWorkspace(workspaceId: string, uid: string) {
-  const workspace = await db.doc(`workspaces/${workspaceId}`).get();
-  if (!workspace.exists || workspace.get('ownerId') !== uid) throw new HttpsError('permission-denied', '워크스페이스 장만 초대를 관리할 수 있습니다.');
+  const workspaceRef = db.doc(`workspaces/${workspaceId}`);
+  const [workspace, member] = await Promise.all([workspaceRef.get(), workspaceRef.collection('members').doc(uid).get()]);
+  if (!workspace.exists || workspace.get('ownerId') !== uid || !member.exists || member.get('role') !== 'owner') {
+    throw new HttpsError('permission-denied', '워크스페이스 장만 초대를 관리할 수 있습니다.');
+  }
   return workspace;
 }
 
@@ -178,8 +181,14 @@ export const revokeInvite = onCall({ region }, async (request) => {
   await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(invite);
     if (!snapshot.exists) throw new HttpsError('not-found', '초대가 없습니다.');
-    const workspace = await transaction.get(db.doc(`workspaces/${snapshot.get('workspaceId')}`));
-    if (!workspace.exists || workspace.get('ownerId') !== user.uid) throw new HttpsError('permission-denied', '워크스페이스 장만 초대를 철회할 수 있습니다.');
+    const workspaceId = snapshot.get('workspaceId');
+    const [workspace, member] = await Promise.all([
+      transaction.get(db.doc(`workspaces/${workspaceId}`)),
+      transaction.get(db.doc(`workspaces/${workspaceId}/members/${user.uid}`)),
+    ]);
+    if (!workspace.exists || workspace.get('ownerId') !== user.uid || !member.exists || member.get('role') !== 'owner') {
+      throw new HttpsError('permission-denied', '워크스페이스 장만 초대를 철회할 수 있습니다.');
+    }
     if (snapshot.get('status') !== 'pending') throw new HttpsError('failed-precondition', '대기 중인 초대만 철회할 수 있습니다.');
     transaction.update(invite, { status: 'revoked', revokedAt: FieldValue.serverTimestamp() });
   });

@@ -148,6 +148,7 @@ try {
   await adminDb.doc('messages/channel-message').set({ workspaceId, sourceType: 'channel', channelId: 'general', content: 'public to members' });
   await adminDb.doc('messages/dm-message').set({ workspaceId, sourceType: 'dm', dmRoomId: 'private', content: 'private' });
   await adminDb.doc('tasks/sample').set({ workspaceId, title: 'Visible task metadata', sourceMessageId: 'dm-message' });
+  await adminDb.doc('meetings/sample').set({ workspaceId, title: 'Team meeting' });
   await assertSucceeds(guestDb.doc('channels/general').get());
   await assertFails(unknownDb.doc('channels/general').get());
   await assertSucceeds(guestDb.doc('messages/channel-message').get());
@@ -160,6 +161,8 @@ try {
   await assertFails(guestDb.doc('dmRooms/private').get());
   await assertSucceeds(guestDb.doc('tasks/sample').get());
   await assertFails(unknownDb.doc('tasks/sample').get());
+  await assertSucceeds(guestDb.doc('meetings/sample').get());
+  await assertFails(unknownDb.doc('meetings/sample').get());
   await assertFails(ownerDb.doc('messages/channel-message').set({ workspaceId, content: 'forged' }));
   await assertFails(guestDb.doc(workspacePath).update({ ownerId: guest.user.uid }));
   await rejected(guest.call('listInvites', { workspaceId }), 'permission-denied');
@@ -172,8 +175,14 @@ try {
   await assertFails(guestDb.doc('messages/channel-message').get());
   await assertFails(guestDb.doc('tasks/sample').get());
   await assertSucceeds(ownerDb.doc('tasks/sample').get());
+  await assertFails(guestDb.doc('meetings/sample').get());
 
-  console.log('Workspace creation, invitation lifecycle/races, DM queries, and revoked membership rules passed.');
+  await adminDb.doc(`${workspacePath}/members/${owner.user.uid}`).delete();
+  await rejected(owner.call('listInvites', { workspaceId }), 'permission-denied');
+  await rejected(owner.call('inviteMember', { workspaceId, email: 'new@example.com' }), 'permission-denied');
+  await rejected(owner.call('revokeInvite', { inviteId: expired.inviteId }), 'permission-denied');
+
+  console.log('Workspace creation, invitation lifecycle/races, DM queries, calendar reads, and revoked membership rules passed.');
 } finally {
   if (rules) await rules.cleanup();
   for (const app of apps) await deleteApp(app);

@@ -24,6 +24,8 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   const setView = useWorkspaceNavigationStore((state) => state.setView);
   const [workspaces, setWorkspaces] = useState<Membership[]>([]);
   const [ready, setReady] = useState(false);
+  const [workspaceLoadError, setWorkspaceLoadError] = useState(false);
+  const [workspaceLoadAttempt, setWorkspaceLoadAttempt] = useState(0);
   const [error, setError] = useState('');
   const [inviteActionError, setInviteActionError] = useState('');
   const [createPending, setCreatePending] = useState(false);
@@ -44,8 +46,9 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
 
   useEffect(() => onSnapshot(collection(db, 'users', user.uid, 'workspaces'), (snapshot) => {
     setWorkspaces(snapshot.docs.map((doc) => doc.data() as Membership));
+    setWorkspaceLoadError(false);
     setReady(true);
-  }, () => { setError('워크스페이스 목록을 불러오지 못했습니다.'); setCreatedWorkspaceId(null); setReady(true); }), [db, user.uid]);
+  }, () => { setWorkspaceLoadError(true); setCreatedWorkspaceId(null); setReady(true); }), [db, user.uid, workspaceLoadAttempt]);
 
   const selected = workspaces.find(({ workspaceId }) => workspaceId === params.get('workspaceId')) ?? workspaces[0];
 
@@ -156,6 +159,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   }
 
   if (!ready) return <div className={styles.loading} role="status">워크스페이스를 불러오는 중입니다…</div>;
+  if (workspaceLoadError) return <main className={styles.page}><section className={styles.card} role="alert"><h1>워크스페이스를 불러오지 못했습니다</h1><p>연결 상태와 로그인 상태를 확인한 뒤 다시 시도해 주세요.</p><button className={styles.retryButton} type="button" onClick={() => { setReady(false); setWorkspaceLoadAttempt((attempt) => attempt + 1); }}>다시 시도</button><div className={styles.emptyAccount}><AccountMenu auth={auth} user={user} displayName={displayName} profile={profile} onSaveName={onSaveName} onSaveDetails={onSaveDetails} onRefresh={onRefresh} /></div></section></main>;
   if (!selected && createdWorkspaceId) return <div className={styles.loading} role="status">워크스페이스를 준비하는 중입니다…</div>;
 
   if (!selected) return (
