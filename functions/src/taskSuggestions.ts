@@ -1,5 +1,6 @@
 import { FieldPath, type Firestore, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import { requireWorkWorkspace } from './workspaceType.js';
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const maxContextMessages = 8;
@@ -37,6 +38,7 @@ export async function suggestTaskFromMessage(db: Firestore, requesterId: string,
   const { workspaceId, sourceMessageId } = requestFields(value);
   const member = await db.doc(`workspaces/${workspaceId}/members/${requesterId}`).get();
   if (!member.exists) throw new HttpsError('permission-denied', '워크스페이스 멤버만 제안을 요청할 수 있습니다.');
+  requireWorkWorkspace(await db.doc(`workspaces/${workspaceId}`).get());
   const message = await db.doc(`messages/${sourceMessageId}`).get();
   if (!message.exists || message.get('workspaceId') !== workspaceId) throw new HttpsError('permission-denied', '원본 메시지에 접근할 수 없습니다.');
   const sourceType = message.get('sourceType');

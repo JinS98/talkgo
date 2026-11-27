@@ -1,5 +1,6 @@
 import { type Firestore, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import { requireWorkWorkspace } from './workspaceType.js';
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const isoPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
@@ -29,8 +30,10 @@ export async function createMeetingRecord(db: Firestore, creatorId: string, valu
   const title = data.title as string;
   const meetingRef = db.collection('meetings').doc();
   await db.runTransaction(async (transaction) => {
+    const workspace = await transaction.get(db.doc(`workspaces/${data.workspaceId}`));
     const member = await transaction.get(db.doc(`workspaces/${data.workspaceId}/members/${creatorId}`));
     if (!member.exists) throw new HttpsError('permission-denied', '워크스페이스 멤버만 회의를 등록할 수 있습니다.');
+    requireWorkWorkspace(workspace);
     const now = Timestamp.now();
     transaction.create(meetingRef, {
       workspaceId: data.workspaceId, title: title.trim(), createdById: creatorId,

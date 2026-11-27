@@ -32,11 +32,11 @@ async function account(name, email) {
   return { user, auth, db, call };
 }
 
-async function createWorkspace(account, name) {
+async function createWorkspace(account, name, type) {
   await getIdToken(account.user, true);
   const workspace = doc(collection(account.db, 'workspaces'));
   const batch = writeBatch(account.db);
-  batch.set(workspace, { name, ownerId: account.user.uid, createdAt: serverTimestamp() });
+  batch.set(workspace, { name, ...(type === undefined ? {} : { type }), ownerId: account.user.uid, createdAt: serverTimestamp() });
   batch.set(doc(account.db, 'workspaces', workspace.id, 'members', account.user.uid), { uid: account.user.uid, email: account.user.email, role: 'owner', joinedAt: serverTimestamp() });
   batch.set(doc(account.db, 'users', account.user.uid, 'workspaces', workspace.id), { workspaceId: workspace.id, name, role: 'owner', joinedAt: serverTimestamp() });
   await batch.commit();
@@ -67,6 +67,14 @@ try {
   const unverifiedWorkspaceId = await createWorkspace(unverified, 'Immediate Team');
   assert.equal((await adminDb.doc(`workspaces/${unverifiedWorkspaceId}`).get()).get('ownerId'), unverified.user.uid);
   const workspaceId = await createWorkspace(owner, 'Talkgo Team');
+  const workWorkspaceId = await createWorkspace(owner, 'New Work Team', 'work');
+  const meetupWorkspaceId = await createWorkspace(owner, 'Weekend Group', 'meetup');
+  assert.equal((await adminDb.doc(`workspaces/${workWorkspaceId}`).get()).get('type'), 'work');
+  assert.equal((await adminDb.doc(`workspaces/${meetupWorkspaceId}`).get()).get('type'), 'meetup');
+  assert.equal((await adminDb.doc(`users/${owner.user.uid}/workspaces/${meetupWorkspaceId}`).get()).get('type'), undefined);
+  for (const invalidType of [null, '', 'unknown']) {
+    await assert.rejects(createWorkspace(owner, 'Invalid Type', invalidType), (error) => error.code === 'permission-denied');
+  }
   assert.equal((await adminDb.collection('workspaceInvites').get()).size, 0);
   await assert.rejects(setDoc(doc(collection(owner.db, 'workspaces')), { name: 'Incomplete', ownerId: owner.user.uid, createdAt: serverTimestamp() }), (error) => error.code === 'permission-denied');
   assert.equal((await adminDb.doc(`workspaces/${workspaceId}`).get()).get('ownerId'), owner.user.uid);
@@ -182,6 +190,8 @@ try {
   }
   await assertFails(ownerDb.doc('messages/channel-message').set({ workspaceId, content: 'forged' }));
   await assertFails(guestDb.doc(workspacePath).update({ ownerId: guest.user.uid }));
+  await assertFails(ownerDb.doc(workspacePath).update({ type: 'meetup' }));
+  await assertFails(ownerDb.doc(`workspaces/${workWorkspaceId}`).update({ type: 'meetup' }));
   await rejected(guest.call('listInvites', { workspaceId }), 'permission-denied');
   const listedInvites = (await owner.call('listInvites', { workspaceId })).data.invites;
   assert.ok(listedInvites.length >= 4);

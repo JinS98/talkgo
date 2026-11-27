@@ -38,6 +38,7 @@
     "test:firebase": "firebase emulators:exec --only auth,firestore --project demo-taskgo \"npm run verify:firebase -w @talkgo/web\"",
     "test:auth": "npm run build:functions && npm run prepare:emulator && firebase emulators:exec --only auth,firestore,functions --project demo-taskgo \"npm run verify:auth -w @talkgo/web\"",
     "test:workspace": "npm run build:functions && npm run prepare:emulator && firebase emulators:exec --only auth,firestore,functions --project demo-taskgo \"npm run verify:workspace -w @talkgo/web\"",
+    "test:workspace-types": "firebase emulators:exec --only auth,firestore --project demo-taskgo \"npm run verify:workspace-types -w @talkgo/web\"",
     "test:task-model": "npm run build:functions && npm run prepare:emulator && firebase emulators:exec --only auth,firestore,functions --project demo-taskgo \"node functions/scripts/verify-task-model.mjs\""
   },
   "devDependencies": {

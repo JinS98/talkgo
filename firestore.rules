@@ -61,7 +61,9 @@ service cloud.firestore {
     match /workspaces/{workspaceId} {
       allow get, list: if isMember(workspaceId);
       allow create: if eligibleCreator()
-        && requiredFields(request.resource.data, ['name', 'ownerId', 'createdAt'])
+        && (requiredFields(request.resource.data, ['name', 'ownerId', 'createdAt'])
+          || requiredFields(request.resource.data, ['name', 'ownerId', 'createdAt', 'type'])
+            && request.resource.data.type in ['work', 'meetup'])
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 2

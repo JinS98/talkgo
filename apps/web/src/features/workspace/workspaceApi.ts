@@ -1,15 +1,16 @@
 import { getIdToken, type Auth } from 'firebase/auth';
 import { collection, doc, serverTimestamp, writeBatch, type Firestore } from 'firebase/firestore';
 import { httpsCallable, type Functions } from 'firebase/functions';
+import type { WorkspaceType } from './workspaceType';
 
-export async function createWorkspace(auth: Auth, db: Firestore, name: string, profile?: { title: string; bio: string }): Promise<{ workspaceId: string }> {
+export async function createWorkspace(auth: Auth, db: Firestore, name: string, type: WorkspaceType, profile?: { title: string; bio: string }): Promise<{ workspaceId: string }> {
   const user = auth.currentUser;
   if (!user?.email) throw new Error('이메일 계정으로 로그인해 주세요.');
   await getIdToken(user, true);
   const workspace = doc(collection(db, 'workspaces'));
   const batch = writeBatch(db);
   const trimmedName = name.trim();
-  batch.set(workspace, { name: trimmedName, ownerId: user.uid, createdAt: serverTimestamp() });
+  batch.set(workspace, { name: trimmedName, type, ownerId: user.uid, createdAt: serverTimestamp() });
   batch.set(doc(db, 'workspaces', workspace.id, 'members', user.uid), { uid: user.uid, email: user.email, displayName: user.displayName?.trim().slice(0, 80) || user.email.split('@')[0], title: profile?.title || '', bio: profile?.bio || '', role: 'owner', joinedAt: serverTimestamp() });
   batch.set(doc(db, 'users', user.uid, 'workspaces', workspace.id), { workspaceId: workspace.id, name: trimmedName, role: 'owner', joinedAt: serverTimestamp() });
   await batch.commit();

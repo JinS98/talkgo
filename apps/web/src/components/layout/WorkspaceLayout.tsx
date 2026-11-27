@@ -9,6 +9,7 @@ import {
 import { useWorkspaceNavigationStore } from '../../store/useWorkspaceNavigationStore';
 import type { WorkspaceMember } from '../../features/chat/useWorkspaceConversations';
 import type { AppView } from '../../types/domain';
+import type { WorkspaceType } from '../../features/workspace/workspaceType';
 import { MemberProfilePanel } from './MemberProfilePanel';
 import styles from './WorkspaceLayout.module.scss';
 
@@ -18,6 +19,7 @@ interface WorkspaceLayoutProps {
   accountControls?: ReactNode;
   notificationControls?: ReactNode;
   workspaceName?: string;
+  workspaceType?: WorkspaceType;
   canManageWorkspace?: boolean;
   liveChat?: boolean;
   channels?: DemoChannel[];
@@ -49,7 +51,7 @@ function NavigationIcon({ view }: { view: AppView }) {
   return <span className={styles.navIcon}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[view]}</svg></span>;
 }
 
-export function WorkspaceLayout({ children, workspaceControls, accountControls, notificationControls, workspaceName, canManageWorkspace = false, liveChat = false, channels, directMessages, members = [], viewerId = '', profileMember, profilePending = false, profileError = '', onOpenProfile, onCloseProfile, onStartDm, conversationError }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ children, workspaceControls, accountControls, notificationControls, workspaceName, workspaceType = 'work', canManageWorkspace = false, liveChat = false, channels, directMessages, members = [], viewerId = '', profileMember, profilePending = false, profileError = '', onOpenProfile, onCloseProfile, onStartDm, conversationError }: WorkspaceLayoutProps) {
   const mainRef = useRef<HTMLElement>(null);
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
@@ -74,7 +76,7 @@ export function WorkspaceLayout({ children, workspaceControls, accountControls, 
         <nav className={styles.primaryNav} aria-label="화면 전환">
           <span className={styles.railBrand}><img src="/favicon.svg" alt="Talkgo" /></span>
           <ul className={styles.primaryList}>
-            {primaryViews.map(({ id, label }) => <li key={id}>
+            {primaryViews.filter(({ id }) => workspaceType === 'work' || id === 'chat').map(({ id, label }) => <li key={id}>
               <button className={`${styles.primaryButton} ${activeView === id ? styles.active : ''}`} type="button" aria-pressed={activeView === id} onClick={() => setView(id)}>
                 <NavigationIcon view={id} /><span>{label}</span>
               </button>

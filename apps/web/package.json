@@ -17,6 +17,7 @@
     "verify:live-chat": "node scripts/verify-live-chat.mjs",
     "verify:member-profile": "node scripts/verify-member-profile.mjs",
     "verify:task-links": "node scripts/verify-task-links.mjs",
+    "verify:workspace-types": "node scripts/verify-workspace-types.mjs",
     "verify:calendar-browser": "node scripts/verify-calendar-browser.mjs"
   },
   "dependencies": {

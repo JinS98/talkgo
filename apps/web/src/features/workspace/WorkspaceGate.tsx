@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { collection, onSnapshot, type Firestore } from 'firebase/firestore';
+import { collection, doc, onSnapshot, type Firestore } from 'firebase/firestore';
 import type { Auth, User } from 'firebase/auth';
 import type { Functions } from 'firebase/functions';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -11,6 +11,7 @@ import { callWorkspace, createWorkspace, workspaceCreationError, workspaceError 
 import { WorkspacePicker } from './WorkspacePicker';
 import { InviteList } from './InviteList';
 import type { Invite, Membership } from './workspaceTypes';
+import { readWorkspaceType, type WorkspaceType } from './workspaceType';
 import styles from './WorkspaceGate.module.scss';
 
 interface Member { uid: string; email: string; displayName?: string; role: 'owner' | 'member' }
@@ -23,6 +24,8 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const setView = useWorkspaceNavigationStore((state) => state.setView);
   const [workspaces, setWorkspaces] = useState<Membership[]>([]);
+  const [workspaceTypes, setWorkspaceTypes] = useState<Record<string, { type?: WorkspaceType; error?: string }>>({});
+  const [workspaceTypeAttempt, setWorkspaceTypeAttempt] = useState(0);
   const [ready, setReady] = useState(false);
   const [workspaceLoadError, setWorkspaceLoadError] = useState(false);
   const [workspaceLoadAttempt, setWorkspaceLoadAttempt] = useState(0);
@@ -32,6 +35,8 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   const [invitePending, setInvitePending] = useState(false);
   const [revokingIds, setRevokingIds] = useState<Set<string>>(() => new Set());
   const [name, setName] = useState('');
+  const [newWorkspaceType, setNewWorkspaceType] = useState<WorkspaceType>('work');
+  const [showCreatePage, setShowCreatePage] = useState(false);
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [inviteLink, setInviteLink] = useState('');
@@ -45,18 +50,35 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   const [localLink, setLocalLink] = useState('');
 
   useEffect(() => onSnapshot(collection(db, 'users', user.uid, 'workspaces'), (snapshot) => {
-    setWorkspaces(snapshot.docs.map((doc) => doc.data() as Membership));
+    setWorkspaces(snapshot.docs.map((item) => ({ ...item.data() as Membership, workspaceId: item.id })));
     setWorkspaceLoadError(false);
     setReady(true);
   }, () => { setWorkspaceLoadError(true); setCreatedWorkspaceId(null); setReady(true); }), [db, user.uid, workspaceLoadAttempt]);
 
+  const workspaceIds = JSON.stringify(workspaces.map(({ workspaceId }) => workspaceId).sort());
+  useEffect(() => {
+    const subscriptions = (JSON.parse(workspaceIds) as string[]).map((workspaceId) => onSnapshot(doc(db, 'workspaces', workspaceId), (snapshot) => {
+      try {
+        const type = readWorkspaceType(snapshot.data());
+        setWorkspaceTypes((current) => ({ ...current, [workspaceId]: { type } }));
+      } catch (cause) {
+        setWorkspaceTypes((current) => ({ ...current, [workspaceId]: { error: cause instanceof Error ? cause.message : '워크스페이스 유형을 확인할 수 없습니다.' } }));
+      }
+    }, () => setWorkspaceTypes((current) => ({ ...current, [workspaceId]: { error: '워크스페이스 정보를 불러오지 못했습니다. 연결 상태와 권한을 확인해 주세요.' } }))));
+    return () => subscriptions.forEach((unsubscribe) => unsubscribe());
+  }, [db, workspaceIds, workspaceTypeAttempt]);
+
   const selected = workspaces.find(({ workspaceId }) => workspaceId === params.get('workspaceId')) ?? workspaces[0];
+  const selectedWorkspaceType = selected && workspaceTypes[selected.workspaceId];
 
   useEffect(() => { selectedWorkspaceIdRef.current = selected?.workspaceId ?? ''; }, [selected?.workspaceId]);
 
   useEffect(() => {
     if (ready && selected?.role !== 'owner' && activeView === 'workspace') setView('chat');
   }, [activeView, ready, selected?.role, setView]);
+  useEffect(() => {
+    if (selectedWorkspaceType?.type === 'meetup' && (activeView === 'board' || activeView === 'calendar')) setView('chat');
+  }, [activeView, selectedWorkspaceType?.type, setView]);
 
   useEffect(() => {
     if (activeView !== 'workspace' || selected?.role !== 'owner') return;
@@ -81,7 +103,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
     if (createPending) return;
     setCreatePending(true); setError('');
     try {
-      const result = await createWorkspace(auth, db, name, profile);
+      const result = await createWorkspace(auth, db, name, newWorkspaceType, profile);
       setCreatedWorkspaceId(result.workspaceId);
       setParams({ workspaceId: result.workspaceId });
       setInvitesWorkspaceId('');
@@ -89,6 +111,8 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
       setInvitesError('');
       setMembersError('');
       setName('');
+      setNewWorkspaceType('work');
+      setShowCreatePage(false);
     } catch (cause) { setError(workspaceCreationError(cause)); }
     finally { setCreatePending(false); }
   }
@@ -155,6 +179,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
     setMembersError('');
     setInvitesWorkspaceId('');
     setMembersWorkspaceId('');
+    setView('chat');
     setParams({ workspaceId });
   }
 
@@ -173,6 +198,8 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
             <form onSubmit={create} className={styles.form}>
               <label htmlFor="workspace-name">워크스페이스 이름</label>
               <input id="workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={createPending} />
+              <label htmlFor="workspace-type">공간 유형</label>
+              <select id="workspace-type" value={newWorkspaceType} onChange={(event) => setNewWorkspaceType(event.target.value as WorkspaceType)} disabled={createPending}><option value="work">업무 공간</option><option value="meetup">모임 공간</option></select>
               <button type="submit" disabled={createPending}>{createPending ? '만드는 중…' : '만들기'}</button>
             </form>
             {error && <p className={styles.error} role="alert">{error}</p>}
@@ -194,10 +221,30 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
     </main>
   );
 
+  if (showCreatePage) return <main className={styles.page}><section className={styles.card}>
+    <p className={styles.eyebrow}>NEW WORKSPACE</p><h1>새 워크스페이스</h1><p>공간의 목적에 맞는 유형을 선택하세요. 만든 뒤에는 유형을 변경할 수 없습니다.</p>
+    <form className={styles.form} onSubmit={create}>
+      <label htmlFor="new-space-name">워크스페이스 이름</label><input id="new-space-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={createPending} />
+      <label htmlFor="new-space-type">공간 유형</label><select id="new-space-type" value={newWorkspaceType} onChange={(event) => setNewWorkspaceType(event.target.value as WorkspaceType)} disabled={createPending}><option value="work">업무 공간</option><option value="meetup">모임 공간</option></select>
+      <button type="submit" disabled={createPending}>{createPending ? '만드는 중…' : '새 공간 만들기'}</button>
+    </form>
+    {error && <p className={styles.error} role="alert">{error}</p>}
+    <button className={styles.secondaryButton} type="button" onClick={() => { setShowCreatePage(false); setError(''); }}>취소</button>
+    <div className={styles.emptyAccount}><AccountMenu auth={auth} user={user} displayName={displayName} profile={profile} onSaveName={onSaveName} onSaveDetails={onSaveDetails} onRefresh={onRefresh} /></div>
+  </section></main>;
+
+  if (!selectedWorkspaceType) return <div className={styles.loading} role="status">워크스페이스 유형을 확인하는 중입니다…</div>;
+  if (!selectedWorkspaceType.type) return <main className={styles.page}><section className={styles.card} role="alert">
+    <h1>워크스페이스를 열 수 없습니다</h1><p>{selectedWorkspaceType.error}</p>
+    <WorkspacePicker selected={selected} workspaces={workspaces} types={workspaceTypes} onSelect={switchWorkspace} onCreate={() => setShowCreatePage(true)} />
+    <button className={styles.retryButton} type="button" onClick={() => setWorkspaceTypeAttempt((attempt) => attempt + 1)}>다시 시도</button>
+    <div className={styles.emptyAccount}><AccountMenu auth={auth} user={user} displayName={displayName} profile={profile} onSaveName={onSaveName} onSaveDetails={onSaveDetails} onRefresh={onRefresh} /></div>
+  </section></main>;
+
   return (
     <div className={styles.shell}>
-      <App auth={auth} db={db} functions={functions} workspaceId={selected.workspaceId} workspaceName={selected.name} userId={user.uid} senderName={displayName} canManageWorkspace={selected.role === 'owner'} workspaceControls={
-        <WorkspacePicker selected={selected} workspaces={workspaces} onSelect={switchWorkspace} />
+      <App auth={auth} db={db} functions={functions} workspaceId={selected.workspaceId} workspaceName={selected.name} workspaceType={selectedWorkspaceType.type} userId={user.uid} senderName={displayName} canManageWorkspace={selected.role === 'owner'} workspaceControls={
+        <WorkspacePicker selected={selected} workspaces={workspaces} types={workspaceTypes} onSelect={switchWorkspace} onCreate={() => setShowCreatePage(true)} />
       } accountControls={<AccountMenu auth={auth} user={user} displayName={displayName} profile={profile} onSaveName={onSaveName} onSaveDetails={onSaveDetails} onRefresh={onRefresh} />} workspaceManagement={selected.role === 'owner' && <div className={styles.management}>
         <div className={styles.managementHeading}><p className={styles.eyebrow}>WORKSPACE</p><h1>{selected.name} 관리</h1><p>멤버와 초대 현황을 확인하고 새 멤버를 초대하세요.</p></div>
         <div className={styles.managementGrid}>
@@ -206,7 +253,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
             {localLink && <p className={styles.localLink} role="status">{localLink.startsWith('http') ? <a href={localLink}>로컬 초대 링크</a> : localLink}</p>}
             {inviteActionError && <p className={styles.error} role="alert">{inviteActionError}</p>}
           </section>
-          <section className={styles.managementCard} aria-labelledby="create-title"><div className={styles.cardHeading}><h2 id="create-title">새 워크스페이스</h2></div><p className={styles.helper}>별도의 팀 공간을 만들고 관리합니다.</p><form className={styles.form} onSubmit={create}><label htmlFor="new-workspace-name">워크스페이스 이름</label><input id="new-workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={createPending} placeholder="새 워크스페이스 이름" /><button type="submit" disabled={createPending}>{createPending ? '만드는 중…' : '새 공간 만들기'}</button></form>{error && <p className={styles.error} role="alert">{error}</p>}</section>
+          <section className={styles.managementCard} aria-labelledby="create-title"><div className={styles.cardHeading}><h2 id="create-title">새 워크스페이스</h2></div><p className={styles.helper}>별도의 공간을 만듭니다. 생성 후 유형은 변경할 수 없습니다.</p><form className={styles.form} onSubmit={create}><label htmlFor="new-workspace-name">워크스페이스 이름</label><input id="new-workspace-name" value={name} onChange={(event) => setName(event.target.value)} minLength={2} maxLength={80} required disabled={createPending} placeholder="새 워크스페이스 이름" /><label htmlFor="new-workspace-type">공간 유형</label><select id="new-workspace-type" value={newWorkspaceType} onChange={(event) => setNewWorkspaceType(event.target.value as WorkspaceType)} disabled={createPending}><option value="work">업무 공간</option><option value="meetup">모임 공간</option></select><button type="submit" disabled={createPending}>{createPending ? '만드는 중…' : '새 공간 만들기'}</button></form>{error && <p className={styles.error} role="alert">{error}</p>}</section>
           <InviteList invites={invites} loading={invitesWorkspaceId !== selected.workspaceId} error={invitesError} revokingIds={revokingIds} onRefresh={refreshInvites} onRevoke={revoke} />
           <section className={`${styles.managementCard} ${styles.wideCard}`} aria-labelledby="members-title"><div className={styles.cardHeading}><h2 id="members-title">워크스페이스 멤버</h2><span>{membersWorkspaceId === selected.workspaceId ? members.length : 0}명</span></div>
             {membersError && <p className={styles.error} role="alert">{membersError}</p>}

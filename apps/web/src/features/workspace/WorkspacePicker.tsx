@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Membership } from './workspaceTypes';
+import type { WorkspaceType } from './workspaceType';
 import styles from './WorkspaceGate.module.scss';
 
-export function WorkspacePicker({ selected, workspaces, onSelect }: { selected: Membership; workspaces: Membership[]; onSelect: (workspaceId: string) => void }) {
+export function WorkspacePicker({ selected, workspaces, types = {}, onSelect, onCreate }: { selected: Membership; workspaces: Membership[]; types?: Record<string, { type?: WorkspaceType; error?: string }>; onSelect: (workspaceId: string) => void; onCreate?: () => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -26,14 +27,15 @@ export function WorkspacePicker({ selected, workspaces, onSelect }: { selected: 
   return <div className={styles.workspacePicker} ref={rootRef}>
     <button ref={buttonRef} type="button" aria-label="워크스페이스 선택" aria-expanded={open} aria-controls="workspace-options" onClick={() => setOpen((value) => !value)}>
       <span className={styles.pickerIcon} aria-hidden="true">{selected.name.charAt(0).toUpperCase()}</span>
-      <span className={styles.pickerName}>{selected.name}</span>
+      <span className={styles.pickerName}>{selected.name}<small>{types[selected.workspaceId]?.type === 'meetup' ? '모임 공간' : types[selected.workspaceId]?.type === 'work' ? '업무 공간' : '유형 확인 중'}</small></span>
       <svg className={styles.pickerMark} aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 7.5 5 5 5-5" /></svg>
     </button>
     {open && <div id="workspace-options" className={styles.pickerOptions} role="group" aria-label="워크스페이스 목록">
       {workspaces.map((item) => <button type="button" key={item.workspaceId} className={item.workspaceId === selected.workspaceId ? styles.selectedOption : ''} aria-current={item.workspaceId === selected.workspaceId ? 'true' : undefined} onClick={() => { setOpen(false); onSelect(item.workspaceId); }}>
         <span className={styles.pickerIcon} aria-hidden="true">{item.name.charAt(0).toUpperCase()}</span>
-        <span>{item.name}</span>
+        <span className={styles.pickerOptionName}>{item.name}<small>{types[item.workspaceId]?.type === 'meetup' ? '모임 공간' : types[item.workspaceId]?.type === 'work' ? '업무 공간' : types[item.workspaceId]?.error ? '열 수 없음' : '유형 확인 중'}</small></span>
       </button>)}
+      {onCreate && <button type="button" className={styles.createOption} onClick={() => { setOpen(false); onCreate(); }}>＋ 새 워크스페이스</button>}
     </div>}
   </div>;
 }

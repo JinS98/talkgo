@@ -52,6 +52,13 @@ try {
   }
   batch.set(adminDb.doc('workspaces/other-team'), { name: 'Other Team', ownerId: outsider.user.uid });
   batch.set(adminDb.doc(`workspaces/other-team/members/${outsider.user.uid}`), { uid: outsider.user.uid, role: 'owner' });
+  for (const [id, type] of [['typed-work', 'work'], ['typed-meetup', 'meetup'], ['typed-invalid', null]]) {
+    batch.set(adminDb.doc(`workspaces/${id}`), { name: id, ownerId: owner.user.uid, type });
+    batch.set(adminDb.doc(`workspaces/${id}/members/${owner.user.uid}`), { uid: owner.user.uid, role: 'owner' });
+    batch.set(adminDb.doc(`workspaces/${id}/members/${assignee.user.uid}`), { uid: assignee.user.uid, role: 'member' });
+    batch.set(adminDb.doc(`channels/${id}`), { workspaceId: id, name: 'General' });
+    batch.set(adminDb.doc(`messages/${id}-source`), { workspaceId: id, sourceType: 'channel', channelId: id, senderId: owner.user.uid, clientMessageId: `${id}-client`, content: 'Source text', createdAt: Timestamp.now() });
+  }
   batch.set(adminDb.doc('channels/task-general'), { workspaceId, name: 'General' });
   batch.set(adminDb.doc('dmRooms/task-private'), { workspaceId, participantIds: [member.user.uid, assignee.user.uid] });
   batch.set(adminDb.doc('messages/task-channel-source'), {
@@ -124,6 +131,10 @@ try {
   await assert.rejects(getDoc(doc(outsider.db, 'tasks', dmTaskId)), (error) => error.code === 'permission-denied');
   await assert.rejects(setDoc(doc(owner.db, 'tasks', 'forged'), { workspaceId, title: 'forged' }), (error) => error.code === 'permission-denied');
   assert.equal((await adminDb.collection('tasks').get()).size, 2);
+  await rejected(owner.create({ ...input, workspaceId: 'typed-meetup', sourceMessageId: 'typed-meetup-source' }), 'failed-precondition');
+  await rejected(owner.create({ ...input, workspaceId: 'typed-invalid', sourceMessageId: 'typed-invalid-source' }), 'failed-precondition');
+  await rejected(owner.suggest({ workspaceId: 'typed-meetup', sourceMessageId: 'typed-meetup-source' }), 'failed-precondition');
+  await rejected(owner.suggest({ workspaceId: 'typed-invalid', sourceMessageId: 'typed-invalid-source' }), 'failed-precondition');
 
   const channelSource = { workspaceId, sourceMessageId: 'task-channel-source' };
   const dmSource = { workspaceId, sourceMessageId: 'task-dm-source' };
@@ -136,6 +147,7 @@ try {
   assert.equal(suggestion.demo, true);
   assert.equal(suggestion.candidates[0].title, 'Private original text');
   assert.equal((await adminDb.collection('tasks').get()).size, 2, 'A suggestion must never create a task');
+  assert.ok((await owner.create({ ...input, workspaceId: 'typed-work', sourceMessageId: 'typed-work-source' })).data.taskId);
 
   const sourceTime = (await adminDb.doc('messages/task-dm-source').get()).get('createdAt').toMillis();
   const contextBatch = adminDb.batch();

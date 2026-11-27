@@ -1,6 +1,7 @@
 import { type Firestore, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { CreateTaskRequest, TaskRecord, TaskSourceType } from '@talkgo/contracts/task';
+import { requireWorkWorkspace } from './workspaceType.js';
 
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 const requiredFields = ['workspaceId', 'sourceMessageId', 'title', 'assigneeId', 'dueDate', 'reviewRequired'];
@@ -62,18 +63,20 @@ export async function createTaskRecord(db: Firestore, creatorId: string, value: 
   const input = parseCreateTaskRequest(value);
   const requesterId = input.requesterId ?? creatorId;
   const creatorRef = db.doc(`workspaces/${input.workspaceId}/members/${creatorId}`);
+  const workspaceRef = db.doc(`workspaces/${input.workspaceId}`);
   const requesterRef = db.doc(`workspaces/${input.workspaceId}/members/${requesterId}`);
   const assigneeRef = db.doc(`workspaces/${input.workspaceId}/members/${input.assigneeId}`);
   const messageRef = db.doc(`messages/${input.sourceMessageId}`);
   const taskRef = db.collection('tasks').doc();
 
   return db.runTransaction(async (transaction) => {
-    const [creator, requester, assignee, message] = await Promise.all([
-      transaction.get(creatorRef), transaction.get(requesterRef), transaction.get(assigneeRef), transaction.get(messageRef),
+    const [workspace, creator, requester, assignee, message] = await Promise.all([
+      transaction.get(workspaceRef), transaction.get(creatorRef), transaction.get(requesterRef), transaction.get(assigneeRef), transaction.get(messageRef),
     ]);
     if (!creator.exists || !message.exists || message.get('workspaceId') !== input.workspaceId) {
       throw new HttpsError('permission-denied', '이 워크스페이스의 원본 메시지에 접근할 수 없습니다.');
     }
+    requireWorkWorkspace(workspace);
     if (!requester.exists) throw new HttpsError('failed-precondition', '요청자가 워크스페이스 멤버가 아닙니다.');
     if (!assignee.exists) throw new HttpsError('failed-precondition', '담당자가 워크스페이스 멤버가 아닙니다.');
     const sourceType = message.get('sourceType');
