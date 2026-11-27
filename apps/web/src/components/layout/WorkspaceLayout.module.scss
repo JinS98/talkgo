@@ -58,13 +58,13 @@
 @media (max-width:650px) {
   .shell { display:flex; flex-direction:column; }
   .sidebar { display:flex; flex:0 0 auto; flex-direction:column; max-height:min(42dvh,250px); border-right:0; border-bottom:1px solid var(--line); }
-  .primaryNav { flex:0 0 50px; flex-direction:row; gap:8px; padding:5px 10px; border-right:0; border-bottom:1px solid var(--line); }
+  .primaryNav { flex:0 0 50px; flex-direction:row; justify-content:flex-start; gap:8px; overflow-x:auto; overflow-y:hidden; padding:5px 10px; border-right:0; border-bottom:1px solid var(--line); scrollbar-width:thin; }
   .railBrand { width:auto; height:auto; margin:0 8px 0 0; }
-  .primaryList { flex:1; flex-direction:row; justify-content:center; width:auto; gap:3px; }
-  .primaryButton,.manageLink { flex-direction:row; width:auto; min-height:36px; gap:4px; padding:5px 7px; font-size:10px; white-space:nowrap; }
+  .primaryList { flex:0 0 auto; flex-direction:row; width:auto; gap:3px; }
+  .primaryButton,.manageLink { flex:0 0 auto; flex-direction:row; width:auto; min-height:36px; gap:4px; padding:5px 7px; font-size:10px; white-space:nowrap; }
   .primaryButton .navIcon,.manageLink .navIcon { flex-basis:16px; width:16px; }
   .primaryButton .navIcon svg,.manageLink .navIcon svg { width:16px; height:16px; }
-  .manageLink { flex:0 0 auto; margin:0; }
+  .manageLink { margin:0; }
   .sidebarBody { flex:1 1 auto; padding:0 12px 7px; }
   .brandRow { display:none; }
   .workspaceSection { margin:8px 0; }

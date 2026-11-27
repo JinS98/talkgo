@@ -8,6 +8,7 @@ interface WorkspaceNavigationState {
   focusedTaskId: string | null;
   focusedMessageId: string | null;
   setView: (view: AppView) => void;
+  setConversation: (conversation: ConversationSelection) => void;
   selectConversation: (conversation: ConversationSelection) => void;
   openTask: (taskId: string) => void;
   openMessage: (conversation: ConversationSelection, messageId: string) => void;
@@ -20,6 +21,7 @@ export const useWorkspaceNavigationStore = create<WorkspaceNavigationState>()((s
   focusedTaskId: null,
   focusedMessageId: null,
   setView: (activeView) => set({ activeView, focusedTaskId: null, focusedMessageId: null }),
+  setConversation: (selectedConversation) => set({ selectedConversation, focusedTaskId: null, focusedMessageId: null }),
   selectConversation: (selectedConversation) => set({
     activeView: 'chat',
     selectedConversation,

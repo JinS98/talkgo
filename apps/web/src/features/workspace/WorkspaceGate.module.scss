@@ -45,4 +45,4 @@
 .localLink { overflow-wrap:anywhere; font-size:12px; }.localLink a { color:var(--accent); }.empty { font-size:12px; }
 @media (max-width:900px) { .managementGrid { grid-template-columns:1fr; } .wideCard { grid-column:auto; } }
 @media (max-width:760px) { .emptyOptions { grid-template-columns:1fr; } .emptyOptions .card { padding:24px; } }
-@media (max-width:650px) { .managementCard { padding:18px; } .workspacePicker > button { min-height:40px; padding:5px 8px; } .pickerIcon { flex-basis:27px; height:27px; } .pickerName { font-size:11px; } }
+@media (max-width:650px) { .managementCard { padding:18px; } .workspacePicker > button { min-height:40px; padding:5px 8px; } .pickerIcon { flex-basis:27px; height:27px; } .pickerName { font-size:11px; } .createdNotice { position:fixed; top:auto; right:12px; bottom:12px; width:min(440px,calc(100vw - 24px)); } }

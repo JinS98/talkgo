@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { collection, doc, onSnapshot, type Firestore } from 'firebase/firestore';
+import { collection, doc, getDocFromServer, onSnapshot, type Firestore } from 'firebase/firestore';
 import type { Auth, User } from 'firebase/auth';
 import type { Functions } from 'firebase/functions';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -21,6 +21,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const selectedWorkspaceIdRef = useRef('');
+  const openedWorkspaceRef = useRef('');
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const setView = useWorkspaceNavigationStore((state) => state.setView);
   const [workspaces, setWorkspaces] = useState<Membership[]>([]);
@@ -57,27 +58,46 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
 
   const workspaceIds = JSON.stringify(workspaces.map(({ workspaceId }) => workspaceId).sort());
   useEffect(() => {
-    const subscriptions = (JSON.parse(workspaceIds) as string[]).map((workspaceId) => onSnapshot(doc(db, 'workspaces', workspaceId), (snapshot) => {
-      try {
-        const type = readWorkspaceType(snapshot.data());
-        setWorkspaceTypes((current) => ({ ...current, [workspaceId]: { type } }));
-      } catch (cause) {
-        setWorkspaceTypes((current) => ({ ...current, [workspaceId]: { error: cause instanceof Error ? cause.message : '워크스페이스 유형을 확인할 수 없습니다.' } }));
-      }
-    }, () => setWorkspaceTypes((current) => ({ ...current, [workspaceId]: { error: '워크스페이스 정보를 불러오지 못했습니다. 연결 상태와 권한을 확인해 주세요.' } }))));
-    return () => subscriptions.forEach((unsubscribe) => unsubscribe());
-  }, [db, workspaceIds, workspaceTypeAttempt]);
+    if (createPending) return;
+    let active = true;
+    for (const workspaceId of JSON.parse(workspaceIds) as string[]) {
+      void getDocFromServer(doc(db, 'workspaces', workspaceId)).then((snapshot) => {
+        if (!active) return;
+        try {
+          const type = readWorkspaceType(snapshot.data());
+          setWorkspaceTypes((current) => ({ ...current, [workspaceId]: { type } }));
+        } catch (cause) {
+          setWorkspaceTypes((current) => ({ ...current, [workspaceId]: { error: cause instanceof Error ? cause.message : '워크스페이스 유형을 확인할 수 없습니다.' } }));
+        }
+      }).catch((cause) => {
+        if (!active) return;
+        const code = cause && typeof cause === 'object' && 'code' in cause ? String(cause.code) : '';
+        const error = code === 'permission-denied' ? '워크스페이스 접근 권한이 없습니다. 멤버 상태를 확인해 주세요.'
+          : '워크스페이스 정보를 불러오지 못했습니다. 연결 상태와 권한을 확인해 주세요.';
+        setWorkspaceTypes((current) => ({ ...current, [workspaceId]: { error } }));
+      });
+    }
+    return () => { active = false; };
+  }, [createPending, db, workspaceIds, workspaceTypeAttempt]);
 
   const selected = workspaces.find(({ workspaceId }) => workspaceId === params.get('workspaceId')) ?? workspaces[0];
+  const selectedWorkspaceId = selected?.workspaceId;
   const selectedWorkspaceType = selected && workspaceTypes[selected.workspaceId];
 
   useEffect(() => { selectedWorkspaceIdRef.current = selected?.workspaceId ?? ''; }, [selected?.workspaceId]);
+  useEffect(() => {
+    if (!selectedWorkspaceId) return;
+    const key = `${user.uid}:${selectedWorkspaceId}`;
+    if (openedWorkspaceRef.current === key) return;
+    openedWorkspaceRef.current = key;
+    setView('home');
+  }, [selectedWorkspaceId, setView, user.uid]);
 
   useEffect(() => {
-    if (ready && selected?.role !== 'owner' && activeView === 'workspace') setView('chat');
+    if (ready && selected?.role !== 'owner' && activeView === 'workspace') setView('home');
   }, [activeView, ready, selected?.role, setView]);
   useEffect(() => {
-    if (selectedWorkspaceType?.type === 'meetup' && (activeView === 'board' || activeView === 'calendar')) setView('chat');
+    if (selectedWorkspaceType?.type === 'meetup' && (activeView === 'board' || activeView === 'calendar') || selectedWorkspaceType?.type === 'work' && activeView === 'proposals') setView('home');
   }, [activeView, selectedWorkspaceType?.type, setView]);
 
   useEffect(() => {
@@ -179,7 +199,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
     setMembersError('');
     setInvitesWorkspaceId('');
     setMembersWorkspaceId('');
-    setView('chat');
+    setView('home');
     setParams({ workspaceId });
   }
 
@@ -237,7 +257,7 @@ export function WorkspaceGate({ auth, user, db, functions, profile, onSaveName, 
   if (!selectedWorkspaceType.type) return <main className={styles.page}><section className={styles.card} role="alert">
     <h1>워크스페이스를 열 수 없습니다</h1><p>{selectedWorkspaceType.error}</p>
     <WorkspacePicker selected={selected} workspaces={workspaces} types={workspaceTypes} onSelect={switchWorkspace} onCreate={() => setShowCreatePage(true)} />
-    <button className={styles.retryButton} type="button" onClick={() => setWorkspaceTypeAttempt((attempt) => attempt + 1)}>다시 시도</button>
+    <button className={styles.retryButton} type="button" onClick={() => { setWorkspaceTypes((current) => ({ ...current, [selected.workspaceId]: {} })); setWorkspaceTypeAttempt((attempt) => attempt + 1); }}>다시 시도</button>
     <div className={styles.emptyAccount}><AccountMenu auth={auth} user={user} displayName={displayName} profile={profile} onSaveName={onSaveName} onSaveDetails={onSaveDetails} onRefresh={onRefresh} /></div>
   </section></main>;
 

@@ -3,7 +3,7 @@ import { initializeApp as initializeAdminApp, deleteApp as deleteAdminApp } from
 import { getFirestore as getAdminFirestore, Timestamp } from 'firebase-admin/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, getIdToken, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
-import { collection, connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, connectFirestoreEmulator, doc, getDoc, getFirestore, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from 'firebase/functions';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 
@@ -71,6 +71,8 @@ try {
   const meetupWorkspaceId = await createWorkspace(owner, 'Weekend Group', 'meetup');
   assert.equal((await adminDb.doc(`workspaces/${workWorkspaceId}`).get()).get('type'), 'work');
   assert.equal((await adminDb.doc(`workspaces/${meetupWorkspaceId}`).get()).get('type'), 'meetup');
+  assert.equal((await getDoc(doc(owner.db, 'workspaces', workWorkspaceId))).data()?.type, 'work');
+  assert.equal((await getDoc(doc(owner.db, 'workspaces', meetupWorkspaceId))).data()?.type, 'meetup');
   assert.equal((await adminDb.doc(`users/${owner.user.uid}/workspaces/${meetupWorkspaceId}`).get()).get('type'), undefined);
   for (const invalidType of [null, '', 'unknown']) {
     await assert.rejects(createWorkspace(owner, 'Invalid Type', invalidType), (error) => error.code === 'permission-denied');

@@ -26,6 +26,7 @@ const server = await createServer({
 
 try {
   const { default: App } = await server.ssrLoadModule('/src/App.tsx');
+  const { WorkHome } = await server.ssrLoadModule('/src/features/workspace/WorkspaceHome.tsx');
   const { useWorkspaceNavigationStore } = await server.ssrLoadModule('/src/store/useWorkspaceNavigationStore.ts');
   const user = userEvent.setup();
   const app = render(React.createElement(App));
@@ -72,8 +73,36 @@ try {
   useWorkspaceNavigationStore.getState().setView('chat');
   render(React.createElement(App, { workspaceName: '참여 팀', canManageWorkspace: false }));
   assert.equal(screen.queryByRole('button', { name: '워크스페이스 관리' }), null);
+  await user.click(screen.getByRole('button', { name: '홈' }));
+  assert.equal(title(), '업무 홈');
+  assert.ok(screen.getAllByText('참여 팀').length >= 1);
+  assert.ok(screen.getByRole('button', { name: '업무 보드 열기' }));
 
-  console.log('Shared navigation store, view switching, and conversation selection passed.');
+  cleanup();
+  useWorkspaceNavigationStore.getState().setView('home');
+  render(React.createElement(App, { workspaceName: '주말 모임', workspaceType: 'meetup' }));
+  assert.equal(title(), '모임 홈');
+  assert.ok(screen.getAllByText('주말 모임').length >= 1);
+  assert.equal(screen.queryByRole('button', { name: '업무 보드' }), null);
+  assert.equal(screen.queryByRole('button', { name: '캘린더' }), null);
+  await user.click(screen.getByRole('button', { name: '모임 제안', exact: true }));
+  assert.equal(title(), '모임 제안 목록');
+  assert.ok(screen.getByText('모임 제안 조회와 응답 기능을 준비 중입니다. 현재는 채팅에서 일정을 논의할 수 있습니다.'));
+
+  cleanup();
+  let openedTask = '';
+  render(React.createElement(WorkHome, { name: '업무 팀', viewerId: 'me', taskState: { tasks: [{ id: 'task-1', title: '검증 업무', status: 'ACCEPTED', assigneeId: 'me', dueDate: { toDate: () => new Date('2026-12-02T09:00:00+09:00') } }], loading: false, error: '' }, onOpenBoard: () => {}, onOpenCalendar: () => {}, onOpenChat: () => {}, onOpenTask: (id) => { openedTask = id; } }));
+  assert.equal(screen.getByText('내 담당 업무').parentElement.querySelector('strong').textContent, '1');
+  await user.click(screen.getByRole('button', { name: /검증 업무/ }));
+  assert.equal(openedTask, 'task-1');
+
+  cleanup();
+  let retried = false;
+  render(React.createElement(WorkHome, { name: '업무 팀', viewerId: 'me', taskState: { tasks: [], loading: false, error: '목록 오류', retry: () => { retried = true; } }, onOpenBoard: () => {}, onOpenCalendar: () => {}, onOpenChat: () => {}, onOpenTask: () => {} }));
+  await user.click(screen.getByRole('button', { name: '다시 시도' }));
+  assert.equal(retried, true);
+
+  console.log('Shared navigation, type-specific homes, task summary/retry and proposal views passed.');
 } finally {
   cleanup();
   await server.close();

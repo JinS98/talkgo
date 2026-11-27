@@ -15,6 +15,8 @@ const admin = initializeApp({ projectId }, 'workspace-types-browser-test');
 const db = getFirestore(admin);
 let vite;
 let browser;
+let page;
+const pageErrors = [];
 
 async function seedWorkspace(user, id, name, type) {
   const now = Timestamp.now();
@@ -39,8 +41,8 @@ try {
   vite = await createViteServer({ root: process.cwd(), mode: 'emulator', server: { host: '127.0.0.1', port, strictPort: true, hmr: false } });
   await vite.listen();
   browser = await chromium.launch({ headless: true, executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', args: ['--no-sandbox'] });
-  const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
-  const pageErrors = [];
+  page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  page.setDefaultTimeout(15000);
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.goto(`http://127.0.0.1:${port}/workspace`);
   await page.getByLabel('이메일', { exact: true }).fill(user.email);
@@ -52,7 +54,15 @@ try {
   await page.getByLabel('공간 유형').selectOption('work');
   await page.getByRole('button', { name: '만들기', exact: true }).click();
   await page.waitForURL((url) => Boolean(url.searchParams.get('workspaceId')));
-  await page.getByRole('button', { name: '업무 보드' }).waitFor();
+  await page.getByRole('button', { name: '업무 보드', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '업무 홈' }).waitFor();
+  await page.getByText('진행할 업무가 없습니다. 채팅에서 새 업무를 요청할 수 있습니다.').waitFor();
+  assert.deepEqual(pageErrors, [], 'Workspace home should load without browser errors.');
+  await page.getByRole('button', { name: '업무 보드', exact: true }).click();
+  await page.getByRole('heading', { name: '업무 보드' }).waitFor();
+  await page.getByText('아직 업무 요청이 없습니다. 채팅 메시지에서 업무를 만들어 보세요.').waitFor();
+  assert.deepEqual(pageErrors, [], 'Task board should load without browser errors.');
+  await page.getByRole('button', { name: '홈', exact: true }).click();
   const workId = new URL(page.url()).searchParams.get('workspaceId');
   assert.ok(workId);
   assert.equal((await db.doc(`workspaces/${workId}`).get()).get('type'), 'work');
@@ -64,23 +74,27 @@ try {
   await page.getByLabel('공간 유형').selectOption('meetup');
   await page.getByRole('button', { name: '새 공간 만들기' }).click();
   await page.waitForURL((url) => Boolean(url.searchParams.get('workspaceId')) && url.searchParams.get('workspaceId') !== workId);
-  await page.getByRole('button', { name: '채팅' }).waitFor();
+  await page.getByRole('button', { name: '채팅', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '모임 홈' }).waitFor();
+  await page.getByRole('button', { name: '모임 제안', exact: true }).click();
+  await page.getByRole('heading', { name: '모임 제안 목록' }).waitFor();
+  await page.getByRole('button', { name: '홈', exact: true }).click();
   const meetupId = new URL(page.url()).searchParams.get('workspaceId');
   assert.ok(meetupId && meetupId !== workId);
   assert.equal((await db.doc(`workspaces/${meetupId}`).get()).get('type'), 'meetup');
   assert.equal((await db.doc(`users/${user.uid}/workspaces/${meetupId}`).get()).get('type'), undefined);
-  assert.equal(await page.getByRole('button', { name: '업무 보드' }).count(), 0);
-  assert.equal(await page.getByRole('button', { name: '캘린더' }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: '업무 보드', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: '캘린더', exact: true }).count(), 0);
 
   await selectWorkspace(page, '업무 팀');
   await page.waitForURL((url) => url.searchParams.get('workspaceId') === workId);
-  await page.getByRole('button', { name: '업무 보드' }).waitFor();
+  await page.getByRole('button', { name: '업무 보드', exact: true }).waitFor();
   assert.equal(new URL(page.url()).searchParams.get('workspaceId'), workId);
 
   await seedWorkspace(user, 'workspace-types-legacy', '기존 공간');
   await selectWorkspace(page, '기존 공간');
   await page.waitForURL((url) => url.searchParams.get('workspaceId') === 'workspace-types-legacy');
-  await page.getByRole('button', { name: '업무 보드' }).waitFor();
+  await page.getByRole('button', { name: '업무 보드', exact: true }).waitFor();
   assert.equal(new URL(page.url()).searchParams.get('workspaceId'), 'workspace-types-legacy');
   await page.getByRole('button', { name: '워크스페이스 선택' }).click();
   await page.getByRole('group', { name: '워크스페이스 목록' }).getByRole('button', { name: /기존 공간/ }).getByText('업무 공간').waitFor();
@@ -92,10 +106,26 @@ try {
   await page.getByRole('button', { name: '다시 시도' }).click();
   await page.getByRole('heading', { name: '워크스페이스를 열 수 없습니다' }).waitFor();
   await selectWorkspace(page, '주말 모임');
-  await page.getByRole('button', { name: '채팅' }).waitFor();
-  assert.equal(await page.getByRole('button', { name: '업무 보드' }).count(), 0);
+  await page.getByRole('button', { name: '채팅', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '업무 보드', exact: true }).count(), 0);
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 760 });
+    await page.getByRole('button', { name: '모임 제안', exact: true }).click();
+    await page.getByRole('heading', { name: '모임 제안 목록' }).waitFor();
+    const size = await page.evaluate(() => ({ viewport: innerWidth, page: document.documentElement.scrollWidth }));
+    assert.ok(size.page <= size.viewport, `Meetup navigation overflows at ${width}px: ${JSON.stringify(size)}`);
+    await page.getByRole('button', { name: '홈', exact: true }).click();
+  }
+  await selectWorkspace(page, '업무 팀');
+  await page.getByRole('button', { name: '업무 보드', exact: true }).click();
+  await page.getByRole('heading', { name: '업무 보드' }).waitFor();
+  const workSize = await page.evaluate(() => ({ viewport: innerWidth, page: document.documentElement.scrollWidth }));
+  assert.ok(workSize.page <= workSize.viewport, `Work navigation overflows at 320px: ${JSON.stringify(workSize)}`);
   assert.deepEqual(pageErrors, []);
-  console.log('Workspace type browser verification passed: create, switch, legacy fallback, invalid type and retry.');
+  console.log('Workspace browser verification passed: types, homes, proposal navigation, mobile layout, legacy fallback and retry.');
+} catch (error) {
+  console.error('Workspace browser state:', { url: page?.url(), pageErrors, body: (await page?.locator('body').innerText().catch(() => ''))?.slice(0, 1200) });
+  throw error;
 } finally {
   await browser?.close();
   await vite?.close();

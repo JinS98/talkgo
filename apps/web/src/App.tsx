@@ -13,6 +13,7 @@ import { useWorkspaceConversations } from './features/chat/useWorkspaceConversat
 import type { WorkspaceMember } from './features/chat/useWorkspaceConversations';
 import { callWorkspace } from './features/workspace/workspaceApi';
 import type { WorkspaceType } from './features/workspace/workspaceType';
+import { WorkHome, MeetupHome, MeetupProposalsPanel } from './features/workspace/WorkspaceHome';
 import { useWorkspaceNavigationStore } from './store/useWorkspaceNavigationStore';
 import { liveRoomKey, useLiveChatStore } from './features/chat/useLiveChatStore';
 import type { TaskRecord } from '@talkgo/contracts/task';
@@ -27,7 +28,7 @@ const upcomingAreas = [
   { id: 'calendar', title: '팀 캘린더', description: '업무 마감과 회의 일정을 함께 살펴봅니다.' },
 ] satisfies { id: AppView; title: string; description: string }[];
 
-const viewCopy: Record<Exclude<AppView, 'chat' | 'workspace'>, { eyebrow: string; title: string; description: string }> = {
+const viewCopy: Record<'board' | 'calendar', { eyebrow: string; title: string; description: string }> = {
   board: {
     eyebrow: 'TASK BOARD',
     title: '업무 보드',
@@ -43,11 +44,13 @@ const viewCopy: Record<Exclude<AppView, 'chat' | 'workspace'>, { eyebrow: string
 export default function App({ workspaceControls, accountControls, auth, db, functions, workspaceId, workspaceName, workspaceType = 'work', userId, senderName, canManageWorkspace = false, workspaceManagement }: { workspaceControls?: ReactNode; accountControls?: ReactNode; auth?: Auth; db?: Firestore; functions?: Functions; workspaceId?: string; workspaceName?: string; workspaceType?: WorkspaceType; userId?: string; senderName?: string; canManageWorkspace?: boolean; workspaceManagement?: ReactNode }) {
   const activeView = useWorkspaceNavigationStore((state) => state.activeView);
   const selectedConversation = useWorkspaceNavigationStore((state) => state.selectedConversation);
+  const setConversation = useWorkspaceNavigationStore((state) => state.setConversation);
   const selectConversation = useWorkspaceNavigationStore((state) => state.selectConversation);
   const focusedTaskId = useWorkspaceNavigationStore((state) => state.focusedTaskId);
   const focusedMessageId = useWorkspaceNavigationStore((state) => state.focusedMessageId);
   const openTask = useWorkspaceNavigationStore((state) => state.openTask);
   const openMessage = useWorkspaceNavigationStore((state) => state.openMessage);
+  const setView = useWorkspaceNavigationStore((state) => state.setView);
   const liveChat = Boolean(auth && db && functions && workspaceId && userId);
   const { channels, directMessages, members, memberEmails, memberNames, error: conversationError } = useWorkspaceConversations(db, workspaceId, userId);
   const taskState = useWorkspaceTasks(db, workspaceType === 'work' ? workspaceId : undefined, userId);
@@ -74,8 +77,8 @@ export default function App({ workspaceControls, accountControls, auth, db, func
   }
 
   useEffect(() => {
-    if (liveChat && workspaceId) selectConversation({ kind: 'channel', id: defaultChannelId(workspaceId), name: '전체' });
-  }, [liveChat, selectConversation, userId, workspaceId]);
+    if (liveChat && workspaceId) setConversation({ kind: 'channel', id: defaultChannelId(workspaceId), name: '전체' });
+  }, [liveChat, setConversation, userId, workspaceId]);
 
   const defaultConversation: ConversationSelection | null = workspaceId ? { kind: 'channel', id: defaultChannelId(workspaceId), name: '전체' } : null;
   const selectedAvailable = selectedConversation.kind === 'channel'
@@ -143,7 +146,11 @@ export default function App({ workspaceControls, accountControls, auth, db, func
 
   return (
     <WorkspaceLayout workspaceControls={workspaceControls} accountControls={accountControls} notificationControls={workspaceType === 'work' && liveChat && auth && db && functions && workspaceId && userId ? <NotificationCenter key={`${workspaceId}:${userId}`} auth={auth} db={db} functions={functions} workspaceId={workspaceId} viewerId={userId} /> : null} workspaceName={workspaceName} workspaceType={workspaceType} canManageWorkspace={canManageWorkspace} liveChat={liveChat} channels={channels} directMessages={directMessages} members={members} viewerId={userId} profileMember={profileMember} profilePending={profilePending} profileError={profileError} onOpenProfile={openProfile} onCloseProfile={closeProfile} onStartDm={(member) => void startDm(member)} conversationError={conversationError}>
-      {showManagement ? workspaceManagement : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? liveChat && auth && functions && workspaceId && userId
+      {showManagement ? workspaceManagement : activeView === 'home' ? workspaceType === 'work'
+        ? <WorkHome name={workspaceName ?? 'Talkgo 데모 팀'} viewerId={userId ?? ''} taskState={taskState} onOpenBoard={() => setView('board')} onOpenCalendar={() => setView('calendar')} onOpenChat={() => setView('chat')} onOpenTask={openTask} />
+        : <MeetupHome name={workspaceName ?? '모임 공간'} memberCount={members.length} channelCount={channels.length} onOpenProposals={() => setView('proposals')} onOpenChat={() => setView('chat')} />
+        : activeView === 'proposals' && workspaceType === 'meetup' ? <MeetupProposalsPanel onOpenChat={() => setView('chat')} />
+        : activeView === 'chat' || (activeView === 'workspace' && !canManageWorkspace) ? liveChat && auth && functions && workspaceId && userId
         ? <LiveChatPanel key={`${userId}:${workspaceId}:${activeConversation.kind}:${activeConversation.id}`} auth={auth} functions={functions} conversation={activeConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName ?? '나'} memberEmails={memberEmails} memberNames={memberNames} taskState={taskState} canCreateTasks={workspaceType === 'work'} focusedMessageId={focusedMessageId} onOpenTask={openTask} onOpenProfile={openProfile} />
         : <ChatPanel conversation={selectedConversation} workspaceId={workspaceId} viewerId={userId} senderName={senderName} /> : workspaceType === 'work' && activeView === 'board' && liveChat && auth && db && functions && workspaceId && userId
           ? <TaskBoardPanel key={workspaceId} auth={auth} db={db} functions={functions} viewerId={userId} memberNames={memberNames} taskState={taskState} focusedTaskId={focusedTaskId} onOpenSource={openSource} /> : workspaceType === 'work' && activeView === 'calendar' && liveChat && auth && db && functions && workspaceId && userId
